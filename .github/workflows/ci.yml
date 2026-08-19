@@ -14,8 +14,8 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build-test:
-    name: build & test
+  test:
+    name: test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -24,14 +24,29 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
+          # Module cache only. The BUILD cache is handled below, because
+          # setup-go derives one key from (os, go version, go.sum) and shares it
+          # across every job in the workflow — so whichever job's post-step
+          # finishes first claims it, and the others restore a cache holding
+          # none of their object files while being told it was a hit.
+          cache: false
 
-      - name: Build
-        run: make build
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          # Per-job key. The race suite's object tree is instrumented and lives
+          # in its own GOCACHE namespace, so it must not share a key with lint's.
+          key: ${{ runner.os }}-go-test-${{ hashFiles('go.sum') }}
+          # Without this fallback, a go.sum change means a fully cold rebuild of
+          # cosmos-sdk, cometbft and go-ethereum — which is exactly why the run
+          # after a dependency bump is always the slowest one.
+          restore-keys: ${{ runner.os }}-go-test-
 
-      - name: Vet
-        run: go vet ./...
-
+      # `go test ./...` compiles every package in the module, so a separate
+      # build step proves nothing the tests do not already prove. The release
+      # workflow does the CGO-free cross-compile next door.
       - name: Test (race)
         run: make test
 
@@ -45,14 +60,31 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
+          cache: false
 
-      # Warm the build cache first: golangci-lint loads packages via go/packages,
-      # and a cold type-check of the cosmos-sdk / go-ethereum / cometbft dep tree
-      # otherwise blows past the lint timeout on a fresh runner.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          key: ${{ runner.os }}-go-lint-${{ hashFiles('go.sum') }}
+          restore-keys: ${{ runner.os }}-go-lint-
+
+      # golangci-lint loads packages through go/packages, and a cold type-check
+      # of this dependency tree otherwise blows its timeout on a fresh runner.
       - name: Warm build cache
         run: go build ./...
 
+      # NOTE: no separate `go vet` step. golangci-lint runs govet, and in config
+      # v2 an `enable:` list ADDS to the default linter set rather than replacing
+      # it, so vet was never opted out of — a second run is a second opinion from
+      # the same analyzers, on the critical path.
+      #
+      # The version is coupled to .golangci.yml, which is `version: "2"`: a v1
+      # binary cannot parse it and fails with "unsupported version of the
+      # configuration" while `make lint` passes locally. golangci-lint-action@v6
+      # installs v1 by default, which is exactly that trap. Bump this pin in
+      # lockstep with the local install or CI and local disagree.
       - name: golangci-lint
         uses: golangci/golangci-lint-action@v7
         with:
