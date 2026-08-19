@@ -67,8 +67,11 @@ is listed for completeness — pocket-ap does not use it (`pocketd` and block
 explorers do); a full node's own REST is unrelated to a `rest` **listener**,
 which relays to suppliers.
 
-`config.example.yaml` ships pointed at Beta. Start there: MainNet spends real
-POKT. These are shared infrastructure — fine to build on, worth swapping for your
+`config.example.yaml` ships pointed at **MainNet**, because that is where a
+staked app usually lives. ⚠️ **Every relay spends real POKT** from your app's
+stake — there is no dry-run and nothing to refund. Switch both `fullnode` lines
+to the Beta column while you are finding your feet: the tokens are worthless and
+the code path is identical. These are shared infrastructure — fine to build on, worth swapping for your
 own node if you come to depend on it.
 
 `pocketd` reaches them with `--network=beta` (or `main`), which sets `--chain-id`,

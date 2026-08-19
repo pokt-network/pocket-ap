@@ -51,26 +51,28 @@ app:
 # You do NOT need to run your own full node. These are the public endpoints
 # operated by Pocket Network Foundation; both transports below are required.
 #
-#   Beta TestNet (chain "pocket-lego-testnet") — what this example uses:
-#     grpc_host_port: "sauron-grpc.beta.infra.pocket.network:443"
-#     rpc_url:        "https://sauron-rpc.beta.infra.pocket.network"
-#
-#   MainNet (chain "pocket") — real POKT, real spend:
+#   MainNet (chain "pocket") — what this example uses. ⚠️ EVERY RELAY SPENDS
+#   REAL POKT from your app's stake. There is no dry-run and no refund.
 #     grpc_host_port: "sauron-grpc.infra.pocket.network:443"
 #     rpc_url:        "https://sauron-rpc.infra.pocket.network"
+#
+#   Beta TestNet (chain "pocket-lego-testnet") — worthless tokens, same code
+#   path. Switch both lines to these while you are still finding your feet:
+#     grpc_host_port: "sauron-grpc.beta.infra.pocket.network:443"
+#     rpc_url:        "https://sauron-rpc.beta.infra.pocket.network"
 #
 # Running your own node instead? Set both to it and flip grpc_insecure: true
 # (see below). Public endpoints are shared infrastructure — fine to start on,
 # worth replacing with your own node if you depend on this.
 fullnode:
   # gRPC endpoint: session / app / account / shared-params queries.
-  grpc_host_port: "sauron-grpc.beta.infra.pocket.network:443"
+  grpc_host_port: "sauron-grpc.infra.pocket.network:443"
   # TLS on the gRPC connection. Keep false for any public endpoint — true sends
   # your queries in plaintext, and is only for a local node with no TLS.
   grpc_insecure: false
   # CometBFT RPC endpoint: current block height (drives session rotation).
   # A different port/host from the gRPC one above — not the same service.
-  rpc_url: "https://sauron-rpc.beta.infra.pocket.network"
+  rpc_url: "https://sauron-rpc.infra.pocket.network"
 
 # Each listener = one local address bound to one (service, rpc_type). Point your
 # app's RPC_URL at the addr. rpc_type is one of:
@@ -96,10 +98,16 @@ admin:
 # addressed as localhost.
 listeners:
   - addr: "127.0.0.1:8545"
-    # service_id is optional with a single app (that app has one service, so
-    # there is nothing to choose) and REQUIRED once several apps are configured.
-    # A service no configured app is staked for fails at startup.
-    service_id: "eth"
+    # service_id is DELIBERATELY OMITTED here, and that is what makes this file
+    # start for you whatever your app is staked for. With a single app there is
+    # nothing to choose — the key already determines the service — so naming one
+    # can only be wrong. This example shipped saying "eth", a MainNet service,
+    # while pointing fullnode at Beta above, so copying it verbatim failed at
+    # startup with: no configured app is staked for service "eth".
+    #
+    # It becomes REQUIRED once several apps are configured, because then there
+    # genuinely is a choice. A service no configured app is staked for fails at
+    # startup rather than at the first relay.
     rpc_type: "json_rpc"
     # allowed_origins allowlists BROWSER Origin headers, on every listener type.
     # Empty (the default) rejects browsers while leaving native clients — node,
@@ -132,13 +140,11 @@ listeners:
     #   - "rpc.internal:8545"
   # REST + CometBFT + unary gRPC share the same stateless HTTP front:
   # - addr: "127.0.0.1:8546"
-  #   service_id: "cosmos"
   #   rpc_type: "rest"
 
   # WebSocket (eth_subscribe and friends). Same allowed_origins / allowed_hosts
   # rules as above — they apply to every listener type.
   # - addr: "127.0.0.1:8547"
-  #   service_id: "eth"
   #   rpc_type: "websocket"
   #   allowed_origins:
   #     - "http://localhost:3000"
