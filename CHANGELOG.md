@@ -6,7 +6,16 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
+Nothing yet.
+
+## [0.1.0] - 2026-08-19
+
 First public release. Everything below is what ships in it.
+
+**Status:** every relay path has completed a real signed relay against a live
+network — not only a test suite. What is *not* yet proven is scale: this has
+been exercised at debugging volumes, not production ones. Treat 0.1.0 as
+"working and verified", not "battle-tested".
 
 ### Added — relay transports (all five Shannon RPC types)
 
@@ -74,6 +83,19 @@ First public release. Everything below is what ships in it.
   amd64/arm64, windows amd64), CGO-free and stripped.
 - `.goreleaser.yaml`, `Dockerfile`, and `.deb`/`.rpm`/`.apk` packaging.
 
+### Known limits
+
+- **npm is not shipped.** Homebrew, the raw archives, the Linux packages and the
+  container image are all published; the npm wrapper is not written yet.
+- **Homebrew coverage depends on a formula, not a cask,** which is what keeps
+  `brew install` working on Linux as well as macOS.
+- **No load testing.** Latency was measured (p50 97ms warm, of which ~55ms is
+  network distance to the test network) but throughput was not.
+- **Streaming has no recorded live run.** SSE/NDJSON was confirmed working
+  against a real supplier by a team member, and is unit-tested here, but no
+  inference service reachable from the test app is staked, so there is no
+  transcript and no regression test against a live stream.
+
 ### Validated
 
 - **Beta TestNet, 2026-07-22** — all five transports completed a real signed relay
@@ -95,4 +117,5 @@ First public release. Everything below is what ships in it.
   rollover closed the bridge with the expected client-facing code and no protocol
   error from the relay miner. No panics were recovered during the run.
 
-[Unreleased]: https://github.com/pokt-network/pocket-ap/commits/main
+[Unreleased]: https://github.com/pokt-network/pocket-ap/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/pokt-network/pocket-ap/releases/tag/v0.1.0
