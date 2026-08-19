@@ -1,0 +1,154 @@
+# goreleaser config — one file produces every distribution channel.
+#
+# Why goreleaser rather than hand-rolled Makefile targets: brew, npm, the raw
+# tarballs and the Linux packages all need the SAME multi-arch binaries, built
+# the same way, with the same checksums. Doing that by hand means four places to
+# get the ldflags wrong. Note this is the first goreleaser config in the
+# ecosystem — poktroll, PATH and the relay-miner ship none — so it sets a
+# convention rather than following one.
+#
+# Test it locally, no remote or tag needed:
+#   goreleaser build --snapshot --clean --single-target   # one platform, fast
+#   goreleaser release --snapshot --clean                 # everything, no publish
+#
+# BLOCKED until the repo is public with a tag: the brew tap and the GitHub
+# release itself both need a remote to push to.
+version: 2
+
+project_name: pocket-ap
+
+before:
+  hooks:
+    - go mod tidy
+
+builds:
+  - id: pocket-ap
+    main: ./cmd/pocket-ap
+    binary: pocket-ap
+    env:
+      # No cgo anywhere in the tree, which is what makes every target below a
+      # plain cross-compile with no toolchain.
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath # reproducible: keeps local paths out of the binary
+    ldflags:
+      # -s -w is not cosmetic here. The cosmos-sdk/cometbft/go-ethereum tree
+      # produces a ~152 MB binary; stripping takes it to ~103 MB (~30 MB
+      # gzipped), which is what every channel below actually downloads.
+      - -s -w
+      - -X main.version={{.Version}}
+      - -X main.commit={{.ShortCommit}}
+      - -X main.date={{.Date}}
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+    ignore:
+      # Nobody runs this on Windows/ARM, and it is one more binary to host.
+      - goos: windows
+        goarch: arm64
+
+archives:
+  - id: pocket-ap
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    # Predictable names: the npm and brew installers construct these.
+    name_template: "{{ .ProjectName }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - README.md
+      - AGENTS.md
+      - config.example.yaml
+      - config.schema.yaml
+      - LICENSE
+
+checksums:
+  name_template: checksums.txt
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-next"
+
+changelog:
+  use: github
+  sort: asc
+  filters:
+    exclude:
+      - "^docs:"
+      - "^test:"
+      - "^style:"
+
+# --- Homebrew -----------------------------------------------------------------
+# Covers macOS AND Linux from one formula — brew runs on both, which is why this
+# is worth more than it looks.
+#
+# The tap is a SEPARATE repo and has to be: `brew tap pokt-network/tap` resolves
+# to github.com/pokt-network/homebrew-tap, so the `homebrew-` prefix is required
+# by brew and a tap can never live inside this repository. It is shared — one tap
+# holds a Formula/<name>.rb per project — which is why it is named homebrew-tap
+# rather than homebrew-pocket-ap.
+#
+# The token is NOT the release token. goreleaser authenticates to the tap
+# separately from the repo it is releasing, and GITHUB_TOKEN in Actions is scoped
+# to this repository alone, so pushing the formula needs its own credential with
+# contents:write on homebrew-tap. Getting this wrong fails late and badly: the
+# build succeeds, the GitHub release publishes, and only then does the formula
+# push fail — after the tag exists.
+brews:
+  - name: pocket-ap
+    repository:
+      owner: pokt-network
+      name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    directory: Formula
+    homepage: https://github.com/pokt-network/pocket-ap
+    description: Self-hosted, drop-in RPC proxy for Pocket Network's Shannon protocol
+    license: MIT
+    test: |
+      system "#{bin}/pocket-ap", "version"
+    install: |
+      bin.install "pocket-ap"
+    caveats: |
+      pocket-ap signs relays with your staked app's PRIVATE KEY and every relay
+      spends your stake. Two things before you run it:
+
+        1. Keep the key out of files. Prefer POCKET_APP_PRIVATE_KEY.
+        2. Bind loopback. ":8545" exposes your stake to your whole network.
+
+      Start from config.example.yaml, then verify with:
+        pocket-ap call -config <path> -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
+
+# --- Linux packages -----------------------------------------------------------
+# Attached to the GitHub release for `dpkg -i` / `rpm -i`. This is NOT official
+# apt: the dependency tree is 929 modules, and Debian requires every one of them
+# packaged separately, which is why nobody in this class of software is in
+# official apt. If `apt install` is ever genuinely needed, host a signed repo —
+# the way Docker and Grafana do.
+nfpms:
+  - id: pocket-ap
+    package_name: pocket-ap
+    homepage: https://github.com/pokt-network/pocket-ap
+    description: Self-hosted, drop-in RPC proxy for Pocket Network's Shannon protocol
+    maintainer: Pocket Network <noreply@pokt.network>
+    license: MIT
+    formats: [deb, rpm, apk]
+    bindir: /usr/bin
+    contents:
+      - src: config.example.yaml
+        dst: /etc/pocket-ap/config.example.yaml
+        type: config
+      - src: config.schema.yaml
+        dst: /etc/pocket-ap/config.schema.yaml
+
+release:
+  github:
+    owner: pokt-network
+    name: pocket-ap
+  header: |
+    ## pocket-ap {{ .Tag }}
+
+    Stake an app, run the binary, point your `RPC_URL` at a local listener.
+    No gateway middleman.
+  footer: |
+    ---
+    **Before you run it:** this signs relays with your app's private key and every
+    relay spends your stake. Bind loopback, keep the key in
+    `POCKET_APP_PRIVATE_KEY`, and see `AGENTS.md` for what the errors actually mean.

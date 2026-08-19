@@ -1,0 +1,122 @@
+name: Release
+
+# Tag-driven, so cutting a release is a deliberate act rather than a side effect
+# of merging. The tag is also the version: `pocket-ap version` reports it, and
+# that string is what a bug report is asked for, so it has to come from the tag
+# rather than from `git describe` on a runner's shallow clone.
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  # This job exists because of the ORDER goreleaser does things in. It builds,
+  # publishes the GitHub release, and only THEN pushes the Homebrew formula — so
+  # a missing or under-permissioned tap token fails after the tag is public and
+  # the release is out, which is the worst moment to discover it and awkward to
+  # undo. Checking first costs seconds and fails while nothing has shipped.
+  preflight:
+    name: preflight
+    runs-on: ubuntu-latest
+    steps:
+      - name: The tap token exists and can write to the tap
+        env:
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${HOMEBREW_TAP_GITHUB_TOKEN}" ]; then
+            echo "::error::HOMEBREW_TAP_GITHUB_TOKEN is empty."
+            echo "It is an ORGANISATION secret, so also confirm this repository is"
+            echo "on its access list — an org secret that exists but is not shared"
+            echo "with the repo arrives here as an empty string, not as an error."
+            exit 1
+          fi
+
+          # .permissions.push is the actual answer to "can goreleaser push the
+          # formula", which is not the same question as "does the token work".
+          # A token that can READ the tap gets a clean 200 here and still fails
+          # at push time.
+          push=$(gh api repos/${{ github.repository_owner }}/homebrew-tap \
+                   --jq '.permissions.push // false' 2>/dev/null || echo "unreachable")
+
+          case "$push" in
+            true)        echo "Tap token can push to homebrew-tap." ;;
+            false)       echo "::error::Token reaches homebrew-tap but cannot push. It needs Contents: Read and write."; exit 1 ;;
+            unreachable) echo "::error::Token cannot see ${{ github.repository_owner }}/homebrew-tap at all. For a fine-grained PAT the usual cause is the resource owner being a personal account rather than the organisation, which makes org repos invisible instead of forbidden."; exit 1 ;;
+          esac
+        shell: bash
+
+  release:
+    name: release
+    needs: preflight
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Tags and full history: the build stamps the version and commit, and a
+          # shallow clone would stamp a version that exists nowhere. goreleaser
+          # also builds its changelog from the commits since the previous tag.
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # Warm the cache before goreleaser: this tree is cosmos-sdk, cometbft and
+      # go-ethereum through the shannon-sdk, and goreleaser builds five targets.
+      # Compiling it cold five times is most of the job's wall clock.
+      - name: Warm build cache
+        run: go build ./...
+
+      - name: Release
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "~> v2"
+          args: release --clean
+        env:
+          # Two DIFFERENT credentials, and they are not interchangeable.
+          # GITHUB_TOKEN is scoped to this repository and publishes the release;
+          # it cannot write to homebrew-tap. HOMEBREW_TAP_GITHUB_TOKEN does only
+          # the formula push. See the brews block in .goreleaser.yaml.
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+
+  image:
+    name: container image
+    needs: preflight
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Log in to ghcr.io
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ github.token }}
+
+      - name: Set up Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          # The Dockerfile's VERSION/COMMIT/DATE args decide what `pocket-ap
+          # version` prints from inside the image. Without them every image
+          # reports itself as "docker", which is useless in a bug report.
+          build-args: |
+            VERSION=${{ github.ref_name }}
+            COMMIT=${{ github.sha }}
+          tags: |
+            ghcr.io/${{ github.repository }}:${{ github.ref_name }}
+            ghcr.io/${{ github.repository }}:latest

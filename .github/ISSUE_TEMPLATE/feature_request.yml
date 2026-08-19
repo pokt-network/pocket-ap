@@ -1,0 +1,30 @@
+name: Feature request
+description: Suggest a change or addition
+labels: [enhancement]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        pocket-ap is deliberately narrow: a transparent passthrough relay client.
+        **Gateway smarts — QoS, reputation, height-awareness, per-chain parsing —
+        are intentionally out of scope and belong in SAGE.** See the "What this is
+        / isn't" and roadmap sections of the README before filing.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What are you trying to do that pocket-ap doesn't let you do today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What would you like it to do?
+    validations:
+      required: true
+  - type: textarea
+    id: scope-check
+    attributes:
+      label: Why this belongs in pocket-ap and not SAGE
+      description: If it makes the proxy smarter about traffic, it probably belongs upstream. Make the case that it's passthrough/operational, not gateway policy.

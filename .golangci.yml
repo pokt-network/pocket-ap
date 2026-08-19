@@ -1,0 +1,20 @@
+# golangci-lint v2 config. Defaults, with two deliberate carve-outs.
+version: "2"
+
+linters:
+  settings:
+    errcheck:
+      # Diagnostic writes to stdout/stderr in the CLI (call.go). The write error
+      # is nothing the tool can act on, and checking each one adds only noise.
+      exclude-functions:
+        - fmt.Fprint
+        - fmt.Fprintf
+        - fmt.Fprintln
+  exclusions:
+    rules:
+      # defer x.Close() on a test server / response / connection during teardown:
+      # the error has nowhere meaningful to go, and forcing a check on every one
+      # buries the test logic. Production Close() calls are still checked.
+      - path: _test\.go
+        linters:
+          - errcheck

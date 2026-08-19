@@ -1,0 +1,17 @@
+# Build output
+/bin/
+# root-level binary only (anchored so it doesn't ignore cmd/pocket-ap/)
+/pocket-ap
+
+# Local configs — MAY CONTAIN APP PRIVATE KEYS. Never commit.
+/local/
+*.local.yaml
+config.yaml
+
+# Go
+*.test
+*.out
+
+# IDE
+.idea/
+.vscode/

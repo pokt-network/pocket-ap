@@ -1,0 +1,56 @@
+name: Bug report
+description: Something isn't working as documented
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for the report. **Do not paste private keys, `local/` contents, or
+        anything from a config that contains a key.** If the issue involves key
+        exposure or unauthorized relaying, report it privately instead — see
+        [SECURITY.md](../blob/main/SECURITY.md).
+
+        Before filing: the "Error → what it actually means" table in
+        [AGENTS.md](../blob/main/AGENTS.md) explains most confusing failures
+        (a wrong key, an unstaked service, the wrong `Content-Type`), and many
+        turn out to be the network or the config, not a bug.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: Output of `pocket-ap version`
+      placeholder: v0.0.0 (commit …)
+    validations:
+      required: true
+  - type: dropdown
+    id: transport
+    attributes:
+      label: RPC type / transport
+      options:
+        - json_rpc
+        - rest
+        - comet_bft
+        - websocket
+        - grpc
+        - call (one-shot)
+        - other / not sure
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you did, what you expected, what you got. Include the exact error text and `-v` output if you have it — with keys redacted.
+    validations:
+      required: true
+  - type: textarea
+    id: config
+    attributes:
+      label: Relevant config (keys redacted)
+      description: The listener/fullnode config involved. Replace any key with its length only.
+      render: yaml
+  - type: input
+    id: network
+    attributes:
+      label: Network & service
+      placeholder: "beta / pnf-pocket-beta"

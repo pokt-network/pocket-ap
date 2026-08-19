@@ -1,0 +1,98 @@
+# Changelog
+
+All notable changes to this project are documented here. The format is based on
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and this project aims to
+follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+
+## [Unreleased]
+
+First public release. Everything below is what ships in it.
+
+### Added — relay transports (all five Shannon RPC types)
+
+- **JSON-RPC, REST, and CometBFT** over one transparent HTTP reverse-proxy adapter
+  (`transport/http.go`). The payload is opaque bytes — no per-chain parsing.
+- **WebSocket** streaming via a protocol-agnostic bridge (`websockets/`,
+  `relay/bridge.go`, `transport/ws.go`): origin-checked, connection-capped, with
+  close-code handling and per-bridge session-rollover handling. Close codes are
+  both **sanitized** (RFC 6455 §7.4.1 reserves 1005/1006/1015 for local inference
+  and forbids sending them) and **role-correct per peer**: the proxy is a server
+  to its client but a client to the relay miner, so 1011/1012/1013 become 1001
+  Going Away upstream rather than asking the miner to reconnect to us.
+- **gRPC** relaying out (`pocket/grpc.go`), native with a **gRPC-Web fallback**
+  (auto-detected per supplier host), plus a gRPC **listener** with h2c and
+  trailer folding/unfolding (`transport/grpc.go`).
+- **SSE / NDJSON streaming** relay path (`relay/stream.go`) for the inference use
+  case, reading the relay miner's `||POKT_STREAM||`-delimited signed batches.
+
+### Added — operation
+
+- **Sovereign app-key signing.** The app address is derived from the configured
+  key; relays are ring-signed with the app's own key, working even under gateway
+  delegation.
+- **Multi-app**: several staked apps in one process via `apps:` (or
+  `POCKET_APP_PRIVATE_KEYS`), each with its own key, service, sessions and
+  supplier policy. An application stakes for exactly one service (poktroll
+  enforces it), so serving several services means several apps — one process
+  now does it, where it previously took one process per service.
+- **Service discovery from the key**: `service_id` is optional in `app`/`apps`
+  and on listeners. It is read from the chain at startup; when configured, it is
+  verified and a mismatch is a startup error instead of every relay failing with
+  "session not found".
+- **Supplier allow/deny lists** per app (`suppliers.allow` / `suppliers.deny`,
+  `selector.Filter`). Static routing policy, not QoS — nothing measures or scores.
+  `allow` is exhaustive (and therefore removes failover if it names one supplier);
+  `deny` wins over `allow`.
+- **`serve`** — the daemon, one listener per RPC type.
+- **`call`** — one-shot relay for debugging, with `-v` diagnostics and `-compare`
+  against a reference URL.
+- **`version`** — ldflags-stamped build info.
+- **Health endpoint** (`health/`) on its own opt-in admin port: `GET
+  /pocket-ap/health`, block-height-staleness readiness signal, in-memory counters.
+  Reports `apps: [{address, service_id}]` — there is no single "the" app.
+- **Panic containment on detached goroutines** (`internal/safego`). `net/http`
+  recovers a panic in the goroutine serving a request, but that stops at the
+  goroutine boundary — and the WebSocket bridge processes every frame on its own
+  goroutine, as do the block poller and each listener. One bad frame from one
+  supplier could take down every listener and every app. Every `go` statement now
+  runs its body under a recovery, and in the bridge the recovery is paired with a
+  shutdown so a contained panic closes the connection instead of wedging it. The
+  count is reported as `recovered_panics` in `/health` (absent when zero).
+- **Selector outcome-feedback seam** (`relay.Observer`) — reports per-attempt
+  results without deciding anything; `selector.Random` pays nothing for it.
+- **Security defaults**: per-listener `allowed_origins` (browser origins rejected
+  by default), `Host`-header check for DNS-rebinding (auto-enabled on loopback
+  binds), local CORS preflight handling, and WebSocket `max_connections`.
+- **Config** (`config/`): strict YAML (unknown fields error), value types, keys
+  from `app.private_key_hex` / `apps[].private_key_hex` or
+  `POCKET_APP_PRIVATE_KEY` / `POCKET_APP_PRIVATE_KEYS`, with a JSON Schema
+  (`config.schema.yaml`) kept in sync by tests.
+
+### Added — distribution
+
+- `make dist` cross-compiles all five targets (darwin arm64/amd64, linux
+  amd64/arm64, windows amd64), CGO-free and stripped.
+- `.goreleaser.yaml`, `Dockerfile`, and `.deb`/`.rpm`/`.apk` packaging.
+
+### Validated
+
+- **Beta TestNet, 2026-07-22** — all five transports completed a real signed relay
+  on the first attempt against service `pnf-pocket-beta` (32 suppliers, chain
+  `pocket-lego-testnet`), through both the `serve` listeners and the `call`
+  one-shot. SSE/NDJSON was confirmed working against a real supplier separately
+  (2026-07-27); it is unit-tested here but has no recorded live run, as no
+  inference service reachable from the beta test app is staked.
+- **Beta TestNet, 2026-08-04** — multi-app, service discovery and supplier
+  allow/deny verified live: two staked apps in one process, both services
+  discovered from their keys, relays through each, separate sessions, the
+  WebSocket bridge handshaking with the session's app, and allow/deny narrowing
+  32 suppliers to 1 and 31 without leaking across apps.
+
+- **Beta TestNet, 2026-08-19** — re-verified end to end after the `poktroll
+  v0.1.35` / `go 1.26.6` dependency bump, since a Shannon SDK bump has broken
+  signing before: a signed CometBFT relay succeeded on the first attempt, a
+  WebSocket subscription returned live block events as text frames, and a session
+  rollover closed the bridge with the expected client-facing code and no protocol
+  error from the relay miner. No panics were recovered during the run.
+
+[Unreleased]: https://github.com/pokt-network/pocket-ap/commits/main

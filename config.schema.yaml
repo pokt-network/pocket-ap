@@ -1,0 +1,316 @@
+$schema: http://json-schema.org/draft-07/schema#
+title: pocket-ap Configuration
+description: >-
+  Configuration schema for pocket-ap, a self-hosted Pocket Network relay proxy.
+  Point an editor at this file with a yaml-language-server modeline for
+  completion and validation:
+    # yaml-language-server: $schema=../config.schema.yaml
+type: object
+required:
+  - fullnode
+additionalProperties: false
+
+properties:
+  app:
+    type: object
+    description: >-
+      The staked application whose key signs every relay — the single-app form,
+      and the common case. Optional here ONLY because the key can come from the
+      POCKET_APP_PRIVATE_KEY environment variable instead.
+
+      Use "apps" instead to run several staked apps in one process. Setting both
+      is an error.
+    additionalProperties: false
+    properties: &app_properties
+      private_key_hex:
+        type: string
+        description: >-
+          The APP's own secp256k1 private key, hex-encoded, exactly 64 hex
+          characters (32 bytes). NOT a gateway key: pocket-ap derives the app
+          address from this key, so the wrong key does not fail — it makes you a
+          different app. A wrong-length key is rejected at startup.
+
+          Prefer POCKET_APP_PRIVATE_KEY so the key never lives in a file. If it
+          must live in a file, keep it under local/ (gitignored).
+        pattern: ^([0-9a-fA-F]{64})?$
+        examples:
+          - ""
+      service_id:
+        type: string
+        description: >-
+          OPTIONAL — the service this app is staked for. Derivable, so leaving it
+          out is fine: poktroll allows an application exactly one service
+          ("application must have exactly one service"), so the key determines it
+          and startup looks it up.
+
+          Setting it is not a second source of truth: startup compares it against
+          the chain and refuses to run on a mismatch. That turns "wrong key
+          pasted" into a startup error instead of every relay failing with
+          "session not found".
+        examples:
+          - pnf-pocket-beta
+          - eth
+      suppliers:
+        type: object
+        description: >-
+          Static allow/deny lists of supplier operator addresses for this app's
+          service. Not QoS: nothing here measures, scores or learns — it is the
+          operator naming which suppliers they are willing to pay.
+
+          It lives on the app because app, service and supplier set line up 1:1:1
+          — a supplier list only means anything relative to one service.
+
+          These are fixed until restart. The same four lists can be sent PER
+          REQUEST as X-Pocket-Allow-Suppliers / X-Pocket-Deny-Suppliers /
+          X-Pocket-Allow-Hosts / X-Pocket-Deny-Hosts headers, which is how an
+          external QoS process steers a long-running pocket-ap. Every list in
+          force must permit a supplier, so a request can only narrow what is
+          configured here — never widen it.
+        additionalProperties: false
+        properties:
+          allow:
+            type: array
+            description: >-
+              When non-empty, EXHAUSTIVE: every supplier not named is dropped,
+              and it caps what a per-request header may ask for.
+
+              A one-entry allowlist removes failover — there is no second
+              supplier left to try when it is down.
+            items:
+              type: string
+              pattern: ^pokt1
+          deny:
+            type: array
+            description: >-
+              Suppliers to remove from selection. Applied first and wins, so an
+              address in both lists is denied.
+            items:
+              type: string
+              pattern: ^pokt1
+          allow_hosts:
+            type: array
+            description: >-
+              The second dimension: match on the HOST an endpoint answers on
+              rather than the supplier's address. One relay-miner operator runs
+              many supplier stakes behind one host, and that set is session-scoped
+              — so "only this operator" is expressible here and nowhere else.
+
+              Entries are bare hosts, never URLs: "rm.example.com" (any port),
+              "rm.example.com:443" (that port only), "*.example.com" (subdomains,
+              not the apex). A URL is rejected at startup.
+
+              Applied together with "allow": both dimensions must permit a
+              supplier.
+            items:
+              type: string
+          deny_hosts:
+            type: array
+            description: >-
+              Hosts to remove from selection, and with them every supplier behind
+              them. Applied first and wins, same as "deny".
+            items:
+              type: string
+
+  apps:
+    type: array
+    description: >-
+      The multi-app form: several staked apps in ONE process, each with its own
+      key, its own service and its own listeners. Mutually exclusive with "app".
+
+      One app per service, not one app for several services: poktroll enforces
+      exactly one service per application, so multiple services means multiple
+      apps. Two apps on the SAME service is rejected (that would be stake
+      rotation, which is a different feature).
+
+      POCKET_APP_PRIVATE_KEYS (comma-separated) fills this from the environment,
+      and is read only when the config names no app at all.
+    items:
+      type: object
+      additionalProperties: false
+      properties: *app_properties
+
+  fullnode:
+    type: object
+    description: >-
+      The Shannon full node to query. TWO transports are required: gRPC for
+      sessions/apps/accounts, and CometBFT RPC for block height. They are
+      different hosts.
+
+      You do not need to run a node — the Pocket Network Foundation operates
+      public ones. Beta TestNet (chain "pocket-lego-testnet") is the default and
+      the place to start; MainNet (chain "pocket") spends real POKT.
+    required:
+      - grpc_host_port
+      - rpc_url
+    additionalProperties: false
+    properties:
+      grpc_host_port:
+        type: string
+        description: >-
+          Full node gRPC endpoint, host:port (no scheme). Public endpoints:
+          sauron-grpc.beta.infra.pocket.network:443 (beta),
+          sauron-grpc.infra.pocket.network:443 (mainnet).
+        examples:
+          - sauron-grpc.beta.infra.pocket.network:443
+          - sauron-grpc.infra.pocket.network:443
+          - localhost:9090
+      grpc_insecure:
+        type: boolean
+        description: >-
+          Disable TLS on the gRPC connection. Only for a local/dev full node —
+          true sends your queries in plaintext. The public endpoints above are
+          TLS on :443, so leave this false for them.
+        default: false
+      rpc_url:
+        type: string
+        description: >-
+          Full node CometBFT RPC endpoint. Used only for block height. Public
+          endpoints: https://sauron-rpc.beta.infra.pocket.network (beta),
+          https://sauron-rpc.infra.pocket.network (mainnet). Note this is a
+          different host from grpc_host_port, not the same one on another port.
+        pattern: ^https?://
+        examples:
+          - https://sauron-rpc.beta.infra.pocket.network
+          - https://sauron-rpc.infra.pocket.network
+          - http://localhost:26657
+
+  admin:
+    type: object
+    description: >-
+      Optional admin listener. Absent or empty addr means no admin listener at
+      all. It binds its own port because relay listeners proxy every path
+      verbatim — mounting /health on one would steal a route from the service
+      being proxied.
+    additionalProperties: false
+    properties:
+      addr:
+        type: string
+        description: >-
+          Address for GET /pocket-ap/health. Returns 200 when the proxy can
+          relay, 503 when it cannot. Use it for READINESS, not liveness:
+          restarting will not fix an unreachable full node.
+        examples:
+          - 127.0.0.1:9090
+
+  grpc_mode:
+    type: string
+    description: >-
+      Framing used to reach a supplier's relay miner for gRPC relays. Global, not
+      per-listener: it describes the path out to the suppliers, not the front
+      door a client dials.
+
+      Empty (auto) tries native gRPC once per supplier host and remembers the
+      answer — correct in both deployments, hence the default. "native" forces
+      HTTP/2, right when nothing terminates it in between. "web" forces gRPC-Web
+      over HTTP/1.1, which is what survives an ingress that terminates HTTP/2:
+      the miner answers native calls "gRPC requires HTTP/2", while gRPC-Web
+      crosses untouched because it carries its trailers inside the body.
+    enum:
+      - ""
+      - native
+      - web
+    default: ""
+
+  listeners:
+    type: array
+    description: >-
+      One local listener per (service, rpc_type). Point your client's RPC_URL at
+      addr. Required to serve; a config for `pocket-ap call` needs none.
+    items:
+      type: object
+      required:
+        - addr
+        - rpc_type
+      additionalProperties: false
+      properties:
+        addr:
+          type: string
+          description: >-
+            Local bind address. BIND LOOPBACK. ":8545" means every interface —
+            anyone on your network can then POST here and spend your stake, with
+            no attack required. Binding 127.0.0.1 also switches on the Host check
+            that closes DNS rebinding (see allowed_hosts).
+          examples:
+            - 127.0.0.1:8545
+        service_id:
+          type: string
+          description: >-
+            Which configured app's service this port fronts. Optional with a
+            single app — that app has exactly one service, so there is nothing to
+            choose. Required once several apps are configured.
+
+            A service no configured app is staked for is a startup error, not a
+            runtime one: otherwise the port binds, accepts traffic and fails
+            every relay with "session not found".
+          examples:
+            - eth
+            - pnf-pocket-beta
+        rpc_type:
+          type: string
+          description: >-
+            Which Shannon RPC type this listener serves. All five are native.
+            json_rpc/rest/comet_bft/grpc are request/response; websocket is a
+            long-lived bridge.
+          enum:
+            - json_rpc
+            - jsonrpc
+            - json-rpc
+            - rest
+            - http
+            - comet_bft
+            - cometbft
+            - comet-bft
+            - tendermint
+            - grpc
+            - websocket
+            - ws
+          examples:
+            - json_rpc
+        allowed_origins:
+          type: array
+          description: >-
+            Allowlist of BROWSER Origin headers, on every rpc_type. Empty (the
+            default) rejects every browser origin while leaving native clients —
+            node, curl, go, which send no Origin — untouched.
+
+            Why a proxy needs this: CORS stops a malicious page READING a
+            cross-origin response, not the request being SENT. A page can POST
+            here with Content-Type: text/plain (a CORS "simple request", so no
+            preflight) and the relay is signed with your key and billed to your
+            stake before CORS says a word.
+
+            "*" disables the check entirely. Do not use it to silence an error.
+          items:
+            type: string
+          examples:
+            - ["http://localhost:3000"]
+        allowed_hosts:
+          type: array
+          description: >-
+            Allowlist of Host header values, which closes DNS rebinding: a page
+            whose DNS re-answers 127.0.0.1 is SAME-ORIGIN to the browser, so a
+            GET carries no Origin and allowed_origins never runs — but the
+            browser still sends the name it dialled.
+
+            Empty is derived from addr, which is right either way: bound to
+            loopback it answers to localhost only; bound wider it is not checked,
+            because you exposed it deliberately and Docker service names or LAN
+            IPs cannot be guessed. "*" disables the check.
+          items:
+            type: string
+          examples:
+            - ["rpc.internal:8545"]
+        max_connections:
+          type: integer
+          description: >-
+            Cap on concurrent WebSocket connections for this listener. WebSocket
+            only: an HTTP request completes and hands its resources back, a
+            WebSocket does not — each one costs goroutines, two sockets and
+            buffers for as long as the client stays.
+
+            0 (the default) means 10000, NOT unlimited: an unbounded count of
+            long-lived connections is the exact failure being prevented, so it
+            must not be what saying nothing gets you. Negative disables the cap.
+          default: 0
+          examples:
+            - 10000

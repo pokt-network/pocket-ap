@@ -1,0 +1,144 @@
+# yaml-language-server: $schema=./config.schema.yaml
+# pocket-ap example config. Copy to local/config.yaml (gitignored) and fill in.
+# The app private key signs relays — keep it out of version control.
+
+app:
+  # secp256k1 hex key of YOUR STAKED APP. Leave empty to read it from the
+  # POCKET_APP_PRIVATE_KEY env var instead.
+  private_key_hex: ""
+  # service_id is OPTIONAL and left out here on purpose: poktroll allows an app
+  # exactly one service, so the key already determines it and pocket-ap looks it
+  # up at startup. Set it if you want startup to check that the key is the app
+  # you think it is — it refuses to run on a mismatch.
+  # service_id: "pnf-pocket-beta"
+  #
+  # suppliers restricts which suppliers may serve this app. Static lists, no
+  # scoring: allow is exhaustive, deny just removes. Deny wins over allow. NOTE a
+  # one-entry allowlist removes failover — there is nothing left to try when it
+  # is down.
+  #
+  # allow_hosts/deny_hosts are the second axis: they name the relay-miner HOST an
+  # endpoint answers on, and so cover every supplier behind it — which an address
+  # list cannot, because that set changes every session. Bare hosts only, never
+  # URLs: "rm.example.com", "rm.example.com:443", "*.example.com" (subdomains,
+  # not the apex). Both axes apply and both must permit a supplier.
+  #
+  # To drive selection from your OWN process, send the same lists per request as
+  # X-Pocket-Allow-Suppliers / X-Pocket-Deny-Suppliers / X-Pocket-Allow-Hosts /
+  # X-Pocket-Deny-Hosts headers instead — no restart needed. A request can only
+  # narrow what is configured here, never widen it, so leaving this empty lets
+  # the header decide alone.
+  # suppliers:
+  #   allow:
+  #     - "pokt1..."
+  #   deny:
+  #     - "pokt1..."
+  #   allow_hosts:
+  #     - "rm.example.com"
+  #   deny_hosts:
+  #     - "*.slow.example"
+
+# Several staked apps in ONE process: use "apps" instead of "app" above (setting
+# both is an error). One app per service — poktroll enforces one service per
+# application, so "multi-service" is spelled "multi-app". Each entry takes the
+# same fields as "app", and listeners then say which service they front.
+# POCKET_APP_PRIVATE_KEYS (comma-separated) fills this from the environment.
+#
+# apps:
+#   - private_key_hex: ""     # staked for, say, pnf-pocket-beta
+#   - private_key_hex: ""     # staked for, say, eth
+
+# You do NOT need to run your own full node. These are the public endpoints
+# operated by Pocket Network Foundation; both transports below are required.
+#
+#   Beta TestNet (chain "pocket-lego-testnet") — what this example uses:
+#     grpc_host_port: "sauron-grpc.beta.infra.pocket.network:443"
+#     rpc_url:        "https://sauron-rpc.beta.infra.pocket.network"
+#
+#   MainNet (chain "pocket") — real POKT, real spend:
+#     grpc_host_port: "sauron-grpc.infra.pocket.network:443"
+#     rpc_url:        "https://sauron-rpc.infra.pocket.network"
+#
+# Running your own node instead? Set both to it and flip grpc_insecure: true
+# (see below). Public endpoints are shared infrastructure — fine to start on,
+# worth replacing with your own node if you depend on this.
+fullnode:
+  # gRPC endpoint: session / app / account / shared-params queries.
+  grpc_host_port: "sauron-grpc.beta.infra.pocket.network:443"
+  # TLS on the gRPC connection. Keep false for any public endpoint — true sends
+  # your queries in plaintext, and is only for a local node with no TLS.
+  grpc_insecure: false
+  # CometBFT RPC endpoint: current block height (drives session rotation).
+  # A different port/host from the gRPC one above — not the same service.
+  rpc_url: "https://sauron-rpc.beta.infra.pocket.network"
+
+# Each listener = one local address bound to one (service, rpc_type). Point your
+# app's RPC_URL at the addr. rpc_type is one of:
+#   json_rpc | rest | comet_bft | grpc | websocket
+# Optional admin listener. Empty/absent = no admin listener at all.
+# Binds its own port: relay listeners proxy every path verbatim, so /health
+# cannot live on one without stealing a route from the proxied service.
+#   GET http://127.0.0.1:9090/pocket-ap/health  -> 200 ok / 503 degraded
+# Counters are in-memory for this process only; nothing is stored or exported.
+admin:
+  addr: "127.0.0.1:9090"
+
+# Bind LOOPBACK unless you mean otherwise.
+#
+# ":8545" means every interface: anyone on your network — office wifi, a cafe,
+# a hotel — can POST to your machine and spend your stake. No attack required,
+# just your IP. They send no Origin header, so they read as a native client,
+# which is correct behaviour and exactly the problem. Bind 127.0.0.1 and the
+# question does not arise.
+#
+# Binding loopback also switches ON the Host check that closes DNS rebinding
+# (see allowed_hosts below), because a loopback listener can only ever be
+# addressed as localhost.
+listeners:
+  - addr: "127.0.0.1:8545"
+    # service_id is optional with a single app (that app has one service, so
+    # there is nothing to choose) and REQUIRED once several apps are configured.
+    # A service no configured app is staked for fails at startup.
+    service_id: "eth"
+    rpc_type: "json_rpc"
+    # allowed_origins allowlists BROWSER Origin headers, on every listener type.
+    # Empty (the default) rejects browsers while leaving native clients — node,
+    # curl, go, which send no Origin — untouched.
+    #
+    # Why a plain HTTP proxy needs this: CORS stops a malicious page READING a
+    # cross-origin response, not the request being SENT. A page can POST here
+    # with Content-Type: text/plain (a CORS "simple request", no preflight) and
+    # the relay is signed with your key and billed to your stake before CORS
+    # says a word. The attacker learns nothing and you still pay.
+    #
+    # Allowlist an origin only if a browser genuinely needs it. "*" disables the
+    # check entirely — do not use it to silence an error.
+    # allowed_origins:
+    #   - "http://localhost:3000"
+
+    # allowed_hosts allowlists Host header values, closing DNS rebinding: a page
+    # on evil.com whose DNS re-answers 127.0.0.1 is SAME-ORIGIN to the browser,
+    # so a GET carries no Origin and allowed_origins never runs — but the browser
+    # still sends "Host: evil.com". POST is already covered (browsers send Origin
+    # on every method but GET/HEAD), so this is what protects REST and CometBFT.
+    #
+    # Empty is derived from addr, which is the right answer either way:
+    #   bound to loopback -> localhost only (rebinding dead, nothing breaks)
+    #   bound wider       -> not checked (you exposed it on purpose, and Docker
+    #                        service names / LAN IPs cannot be guessed)
+    # Set it explicitly to answer to another name, e.g. behind a reverse proxy.
+    # "*" disables the check.
+    # allowed_hosts:
+    #   - "rpc.internal:8545"
+  # REST + CometBFT + unary gRPC share the same stateless HTTP front:
+  # - addr: "127.0.0.1:8546"
+  #   service_id: "cosmos"
+  #   rpc_type: "rest"
+
+  # WebSocket (eth_subscribe and friends). Same allowed_origins / allowed_hosts
+  # rules as above — they apply to every listener type.
+  # - addr: "127.0.0.1:8547"
+  #   service_id: "eth"
+  #   rpc_type: "websocket"
+  #   allowed_origins:
+  #     - "http://localhost:3000"
