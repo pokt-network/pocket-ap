@@ -61,7 +61,7 @@ archives:
       - config.schema.yaml
       - LICENSE
 
-checksums:
+checksum:
   name_template: checksums.txt
 
 snapshot:
