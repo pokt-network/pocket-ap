@@ -1,5 +1,9 @@
 # Build output
 /bin/
+# Release artifacts: `make dist` and goreleaser both write here, and the output
+# is ~400 MB of binaries and packages across five platforms. `make clean`
+# removes it; this stops one `git add -A` from committing it in the meantime.
+/dist/
 # root-level binary only (anchored so it doesn't ignore cmd/pocket-ap/)
 /pocket-ap
 
