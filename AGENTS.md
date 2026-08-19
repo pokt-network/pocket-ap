@@ -33,6 +33,52 @@ curl -sSL https://raw.githubusercontent.com/pokt-network/poktroll/main/tools/scr
 One binary into `/usr/local/bin`, release checksum verified, no node or service
 configured. `-s -- --upgrade` to update.
 
+### Getting a staked app — the prerequisite this repo cannot do for you
+
+pocket-ap **cannot relay without a staked application's private key.** There is
+no demo key, no anonymous mode, and there should not be: a shared key is a public
+credential that spends real stake. If you have no app, nothing below this line
+works, and this is `pocketd` work rather than pocket-ap work.
+
+Beta, whose tokens are worthless. MainNet is identical with `--network=main`.
+
+```sh
+pocketd keys add my-app --keyring-backend test
+APP=$(pocketd keys show my-app -a --keyring-backend test)
+
+# Fund $APP: https://faucet.beta.testnet.pokt.network/pokt/  (a BROWSER page)
+# Minimum is a chain parameter — read it, do not assume:
+pocketd query application params --network=beta -o json    # -> min_stake
+
+cat > stake.yaml <<'EOF'
+stake_amount: 1000000000upokt
+service_ids:
+  - pnf-pocket-beta
+EOF
+
+pocketd tx application stake-application \
+  --config stake.yaml --from my-app --keyring-backend test --network=beta \
+  --fees 200000upokt --yes
+
+# The step that joins the two tools: pocket-ap wants raw hex, the keyring
+# stores armored. Nothing else bridges them.
+pocketd keys export my-app --unarmored-hex --unsafe --keyring-backend test --yes
+```
+
+Then `POCKET_APP_PRIVATE_KEY=<hex>`, and `service_id` needs no configuring — it
+is derived from the key.
+
+Failure modes, in the order you will hit them:
+
+| symptom | cause |
+| --- | --- |
+| `pocketd` hangs or reports the network down | `--network` omitted; it defaults to `tcp://localhost:26657` |
+| `unknown flag: --stake-amount` | `stake-application` takes `--config <file>`, not flags |
+| `application must have exactly one service` | `service_ids` accepts a list; the chain accepts exactly one entry |
+| ~40 lines of stack trace ending `insufficient fees` | `--fees` omitted on the stake tx |
+| `no such host` from `pocketd faucet fund` | its built-in faucet URLs are dead on all three networks; use the browser faucet above |
+| pocket-ap: `no configured app is staked for service X` | listener names a service the key is not staked for — omit `service_id` and let it derive |
+
 ### Public full-node endpoints
 
 Both transports are required and they are **different hosts**.

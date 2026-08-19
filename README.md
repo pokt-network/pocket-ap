@@ -51,6 +51,92 @@ curl -sSL https://raw.githubusercontent.com/pokt-network/poktroll/main/tools/scr
 less pocketd-install.sh && bash pocketd-install.sh
 ```
 
+### From nothing to a working relay
+
+pocket-ap relays for an app that is **already staked**. If you have one, skip to
+[Configuration](#configuration). If you do not, this is the whole path — it is
+`pocketd` work, not pocket-ap work, and it is the part neither tool's docs
+previously owned.
+
+Shown on **Beta**, whose tokens are worthless; MainNet is the same five commands
+with `--network=main` and real POKT.
+
+```sh
+# 1. Create the app key. Use a real keyring backend for anything you care about;
+#    --keyring-backend test stores it unencrypted on disk.
+pocketd keys add my-app --keyring-backend test
+APP=$(pocketd keys show my-app -a --keyring-backend test)
+
+# 2. Fund it. The stake has to come from somewhere, and the minimum is a chain
+#    parameter — read it rather than guessing, it changes:
+pocketd query application params --network=beta -o json   # min_stake, in upokt
+
+# 3. Describe the stake. stake-application takes a --config FILE, not flags.
+cat > stake.yaml <<'EOF'
+stake_amount: 1000000000upokt   # >= min_stake from step 2 (1000000000upokt = 1000 POKT)
+service_ids:
+  - pnf-pocket-beta             # EXACTLY ONE — see below
+EOF
+
+# 4. Stake. --fees is REQUIRED; without it the tx is rejected.
+pocketd tx application stake-application \
+  --config stake.yaml --from my-app --keyring-backend test \
+  --network=beta --fees 200000upokt --yes
+
+# 5. Export the key as hex. THIS is the step that joins the two tools: pocket-ap
+#    wants a raw hex key, and the keyring stores an armored one.
+pocketd keys export my-app --unarmored-hex --unsafe --keyring-backend test --yes
+```
+
+Put that hex string in `POCKET_APP_PRIVATE_KEY` (not in a file), point
+`config.example.yaml`'s `fullnode` block at Beta, and verify with `call` —
+`service_id` is derived from the key, so there is nothing else to configure:
+
+```sh
+POCKET_APP_PRIVATE_KEY=<hex> ./bin/pocket-ap call -config config.yaml -v \
+  -X GET -path /status
+```
+
+Four things that bite, in the order they bite:
+
+- **`service_ids` is a list that must have exactly one entry.** poktroll rejects
+  anything else (`application must have exactly one service`). This is why
+  "several services" means several apps, and why pocket-ap can derive the
+  service from the key at all.
+- **`stake-application` takes `--config <file>`.** There is no `--stake-amount`
+  or `--service-id` flag to reach for.
+- **`--network=beta` sets `--chain-id`, `--node` and `--grpc-addr` together.**
+  Omit it and `pocketd` quietly queries `tcp://localhost:26657` and fails as
+  though the network were down.
+- **`--unarmored-hex` requires `--unsafe`,** and it prints a live key to your
+  terminal. Pipe it somewhere sensible; do not paste it into a config you might
+  commit. Add `--yes` or a script hangs on the confirmation prompt.
+- **Omitting `--fees` fails, and the message is buried.** The transaction returns
+  roughly forty lines of Go stack trace whose last six words are the only ones
+  that matter: `insufficient fees; got:  required: 1upokt`. Trivial to satisfy,
+  easy to lose ten minutes to.
+- **You do NOT need to delegate to a gateway.** An application is always a member
+  of its own ring, so a bare stake is enough: the walkthrough above was run end to
+  end with `delegatee_gateway_addresses: []`. Delegation exists so a gateway can
+  sign on your behalf, which is the arrangement pocket-ap exists to avoid.
+
+> ⚠️ **Step 2: use the web faucet, not `pocketd faucet fund`.** For Beta the
+> faucet is <https://faucet.beta.testnet.pokt.network/pokt/> — a browser page.
+> Paste the address from step 1.
+>
+> `pocketd faucet fund` will not get you there, and it is worth knowing why
+> before you lose time on it. It is built with faucet URLs that no longer
+> resolve — `shannon-testnet-grove-faucet.{alpha,beta}.poktroll.com` and
+> `shannon-grove-faucet.mainnet.poktroll.com`, all three NXDOMAIN as of
+> 2026-08-19 — so it fails with `no such host` on every network. The command
+> also has no `--faucet-base-url` flag despite its own `--help` describing one,
+> so you cannot point it at the working faucet either. And the working faucet is
+> a UI rather than the `POST /{denom}/{address}` REST service that command
+> speaks, so the two would not fit together even if it could be aimed.
+>
+> Everything else in this section was verified against `pocketd` and the poktroll
+> source. This step is the one that needs a browser.
+
 ### Public full-node endpoints
 
 pocket-ap needs **both** transports — gRPC for sessions/apps/accounts, CometBFT

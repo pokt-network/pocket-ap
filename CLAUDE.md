@@ -211,7 +211,10 @@ Crash-fast is defensible. Applying it **by accident, to whichever subset of fail
 This is a near-verbatim lift of SAGE, so a bug found here is usually a bug found
 there — and **nobody upstream is tracking these**.
 
-Open right now: **nothing.** Both entries that used to sit here were re-checked on 2026-08-19 and neither survived — which is the point of re-checking rather than carrying a list forward.
+Open right now:
+- **poktroll's faucet client is broken on every network** (`app/pocket/networks.go:53-55`): all three hardcoded URLs are NXDOMAIN, and `--faucet-base-url` — which `pocketd faucet fund --help` tells you to use — is not a real flag, so it cannot be pointed at the faucet that does work. Found 2026-08-19 while writing the onboarding docs. Not filed yet.
+
+Previously open, now closed: **nothing else.** Both entries that used to sit here were re-checked on 2026-08-19 and neither survived — which is the point of re-checking rather than carrying a list forward.
 
 - **"SAGE `apps.go:58` still has the missing app-key length check" was simply WRONG.** SAGE has `secp256k1KeyLen = 32` and enforces it in `buildOwnedApps` (`apps.go:77`), and `git log -S` puts it there since its initial commit. It never had the gap. ⚠️ This is the failure the relay-miner note further up warns about, repeated: a claim about another repo written from memory instead of from the source. **Read the file before writing that we are ahead of someone.**
 - **"ha-relayminer's WS binary-frame fix is not deployed on beta" was stale**, and contradicted by three other places in this same file — the frame-type section's own "CLOSED 2026-07-22", the 2026-08-04 Validated row, and every beta run since, including 2026-08-19, which saw text frames.
@@ -398,6 +401,22 @@ in this section.
 9. Minor: `SessionManager.Stop()` exists but is unused — the poller exits on ctx cancel at shutdown, which is sufficient.
 
 ## Validated
+
+**Beta TestNet, 2026-08-19 — ONBOARDING, run from zero.** A brand-new app, staked from nothing, to answer "are the docs enough for a machine to use Pocket Network?" They were **not**: no doc mentioned `pocketd keys add`, `stake-application`, a stake config, or key export. The README and AGENTS.md sections that now exist are a transcript of this run, not a reconstruction.
+
+App `pokt1qvhsmxpv73knshu4fkcq3j48vvx8qnjzxkzc0h`, staked 1000 POKT (exactly `min_stake`) for `pnf-pocket-beta`, key held in a throwaway keyring under the scratchpad.
+
+| step | result |
+| --- | --- |
+| `keys add` → faucet → `stake-application` → `keys export` → relay | worked end to end, first relay `attempt 1 … ok` in 467ms |
+| **`delegatee_gateway_addresses: []`** | **the sovereign model with NO gateway delegation at all** — stronger than the PNF app, which is delegated. The app is always a member of its own ring, so a bare stake suffices. |
+| `service_id` configured | none — derived from the key, as designed |
+| config used | `config.example.yaml` verbatim with only the two `fullnode` lines switched to beta |
+
+Three things this run found, all now documented:
+- **`--fees` is required on the stake tx**, and omitting it returns ~40 lines of Go stack trace whose last six words are the message: `insufficient fees; got:  required: 1upokt`.
+- **`keys export --unarmored-hex --unsafe` is the join between the two tools** and was documented nowhere. pocket-ap wants raw hex; the keyring stores armored. An agent that got through staking would still stall here. Needs `--yes` or it hangs a script on a prompt.
+- **`pocketd faucet fund` is dead on ALL THREE networks** — `shannon-testnet-grove-faucet.{alpha,beta}.poktroll.com` and `shannon-grove-faucet.mainnet.poktroll.com` are NXDOMAIN (`poktroll app/pocket/networks.go:53-55`), and the flag its own `--help` names for overriding the base URL, `--faucet-base-url`, does not exist. The working beta faucet is a browser page at `faucet.beta.testnet.pokt.network`, which does not speak the `POST /{denom}/{address}` route that command expects. **Owed upstream.**
 
 **Beta TestNet, 2026-08-19 — the SAGE/PATH catch-up, live.** Service `pnf-pocket-beta`, config `local/beta-config.yaml`, after the `poktroll v0.1.35` / `go 1.26.6` bump. The dep bump is why this run mattered: a shannon-sdk bump is what removed `SignWithRing` last time, so signing had to be re-proved on the wire and not just in the protobuf diff.
 
