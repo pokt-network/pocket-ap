@@ -44,11 +44,25 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
-          cache: true
+          # Module cache only; the build cache is restored below. setup-go
+          # derives one key from (os, go version, go.sum) and shares it across
+          # jobs, and it only SAVES on a miss — so this job restored CI's
+          # host-architecture cache, was told it was a hit, and therefore never
+          # stored the cross-architecture objects that make a release slow.
+          cache: false
 
-      # Warm the cache before goreleaser: this tree is cosmos-sdk, cometbft and
-      # go-ethereum through the shannon-sdk, and goreleaser builds five targets.
-      # Compiling it cold five times is most of the job's wall clock.
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          # Written by the cross-compile job in ci.yml on every push to main.
+          # This tree is cosmos-sdk, cometbft and go-ethereum through the
+          # shannon-sdk, and goreleaser builds five targets: compiling it cold
+          # five times was most of this job's wall clock.
+          key: ${{ runner.os }}-go-release-${{ hashFiles('go.sum') }}
+          restore-keys: ${{ runner.os }}-go-release-
+
       - name: Warm build cache
         run: go build ./...
 

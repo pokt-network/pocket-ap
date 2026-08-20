@@ -50,6 +50,47 @@ jobs:
       - name: Test (race)
         run: make test
 
+  # Cross-compiling here does two jobs at once. It catches a target breaking
+  # before a tag depends on it — until now windows/amd64 was only ever built
+  # during a release, on a public tag that cannot be moved. And it populates the
+  # Go build cache that the RELEASE workflow restores: a cache saved on the
+  # default branch is readable by a tag-triggered run (measured with a throwaway
+  # probe, because the documentation is ambiguous on exactly that case), while a
+  # cache saved from a pull request is scoped to that pull request and would warm
+  # nothing. Hence push-only.
+  #
+  # Every run also refreshes the entry's access time, which is what keeps it from
+  # being evicted: GitHub drops caches untouched for 7 days, and releases are
+  # further apart than that.
+  crossbuild:
+    name: cross-compile
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: false
+
+      - uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cache/go-build
+            ~/go/pkg/mod
+          # Shared with .github/workflows/release.yml on purpose — that is the
+          # whole point. Keep the two keys identical if either changes.
+          key: ${{ runner.os }}-go-release-${{ hashFiles('go.sum') }}
+          restore-keys: ${{ runner.os }}-go-release-
+
+      # `make dist` builds the same five targets as goreleaser with the same
+      # CGO_ENABLED=0 and -trimpath, so the compiled package objects are the ones
+      # the release reuses. The differing -ldflags only affect the final link.
+      - name: Cross-compile every release target
+        run: make dist
+
   lint:
     name: lint
     runs-on: ubuntu-latest
