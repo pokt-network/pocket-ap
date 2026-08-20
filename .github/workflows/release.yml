@@ -72,6 +72,66 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
 
+  # npm publishing is intentionally NOT gated by preflight, and intentionally
+  # cannot fail the release. Until the @pokt-network org and NPM_TOKEN exist this
+  # job reports that it skipped; once they do, it publishes the platform packages
+  # before the wrapper, because a wrapper whose optionalDependencies do not exist
+  # yet installs with a missing binary for anyone quick enough to catch the gap.
+  npm:
+    name: npm
+    needs: release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write # provenance: links the package to this repo and this run
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+          cache: true
+
+      # The binaries are rebuilt rather than downloaded from the release: the
+      # release job's dist/ does not survive into this one, and `goreleaser build`
+      # with the same tag and config produces the same artifacts. -trimpath and
+      # the ldflags come from .goreleaser.yaml, so the stamped version matches
+      # what the archives carry.
+      - name: Build the binaries
+        uses: goreleaser/goreleaser-action@v6
+        with:
+          version: "v2.17.1"
+          args: build --clean --snapshot
+
+      - name: Generate the packages
+        run: node npm/generate.mjs --version "${GITHUB_REF_NAME#v}" --dist dist --out npm/build
+
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${NODE_AUTH_TOKEN:-}" ]; then
+            echo "::notice::NPM_TOKEN is not set — skipping npm publish. See npm/README.md."
+            exit 0
+          fi
+
+          # Platform packages first: the wrapper depends on them by exact version,
+          # and publishing it first opens a window where an install resolves the
+          # wrapper and finds no binary.
+          for dir in npm/build/pocket-ap-*; do
+            echo "publishing $dir"
+            npm publish "$dir" --access public --provenance
+          done
+          npm publish npm/build/pocket-ap --access public --provenance
+        shell: bash
+
   image:
     name: container image
     needs: preflight

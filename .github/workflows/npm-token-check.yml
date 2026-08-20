@@ -1,0 +1,58 @@
+name: npm token check
+
+# The same lesson as the Homebrew tap: a publishing credential that is only ever
+# exercised by tagging is a credential tested on a public tag, and a tag cannot
+# be moved once the Go module proxy has cached it. This runs on demand and costs
+# a few seconds.
+#
+# It is deliberately tolerant of NPM_TOKEN being absent, because that is the
+# expected state until someone creates the org and the token: it reports the
+# situation rather than failing, so a scheduled or curious run is not noise.
+on:
+  workflow_dispatch:
+  workflow_call:
+    outputs:
+      publishable:
+        description: "true when NPM_TOKEN exists and can publish"
+        value: ${{ jobs.check.outputs.publishable }}
+
+jobs:
+  check:
+    name: npm token
+    runs-on: ubuntu-latest
+    outputs:
+      publishable: ${{ steps.probe.outputs.publishable }}
+    steps:
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          registry-url: "https://registry.npmjs.org"
+
+      - name: The npm token exists and can publish
+        id: probe
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${NODE_AUTH_TOKEN}" ]; then
+            echo "NPM_TOKEN is not set. npm publishing is not wired up yet."
+            echo "To enable it: create the @pokt-network org on npmjs.com, then a"
+            echo "GRANULAR ACCESS token with write access to pocket-ap and the"
+            echo "@pokt-network/pocket-ap-* packages. A classic token with 2FA"
+            echo "required on publish cannot be used from CI."
+            echo "publishable=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          # whoami is the cheapest call that actually uses the credential. stderr
+          # is kept: the difference between an expired token and one that is
+          # merely read-only is in what npm says, not in what this script guesses.
+          if ! who=$(npm whoami 2>&1); then
+            echo "::error::NPM_TOKEN is set but npm rejected it. npm said: ${who}"
+            echo "publishable=false" >> "$GITHUB_OUTPUT"
+            exit 1
+          fi
+          echo "Authenticated to npm as ${who}."
+          echo "publishable=true" >> "$GITHUB_OUTPUT"
+        shell: bash

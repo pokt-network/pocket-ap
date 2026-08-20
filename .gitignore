@@ -19,3 +19,6 @@ config.yaml
 # IDE
 .idea/
 .vscode/
+
+# npm build output — generated from dist/ by npm/generate.mjs
+/npm/build/
