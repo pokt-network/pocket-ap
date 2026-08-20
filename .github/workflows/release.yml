@@ -72,11 +72,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
 
-  # npm publishing is intentionally NOT gated by preflight, and intentionally
-  # cannot fail the release. Until the @pokt-network org and NPM_TOKEN exist this
-  # job reports that it skipped; once they do, it publishes the platform packages
-  # before the wrapper, because a wrapper whose optionalDependencies do not exist
-  # yet installs with a missing binary for anyone quick enough to catch the gap.
+  # npm publishing is deferred (see npm/README.md), so this job reports a skip
+  # and CANNOT fail a release. It is deliberately not gated by preflight for the
+  # same reason. If publishing is ever turned on, it publishes the platform
+  # packages before the wrapper, because a wrapper whose optionalDependencies do
+  # not exist yet installs with a missing binary for anyone quick enough to catch
+  # the gap.
   npm:
     name: npm
     needs: release

@@ -18,22 +18,17 @@ first place.
   any project that depends on it.
 - **Six packages per release, version-locked**, plus a per-package trusted
   publisher configuration.
-- **The credential has no good home, and that is the deciding reason.** Both
-  `@pokt-network` and `@pokt-foundation` exist on npm, both were this project's,
-  and access to neither survived the people who created them — their packages are
-  maintained by individual accounts from earlier eras. Publishing from someone's
-  personal account would recreate exactly that: one person holding a
-  project-critical name, stranded the moment they move on.
+- **The publishing identity is an open question**, and it is not one to settle in
+  a hurry: a package name is permanent, and whoever holds the ability to publish
+  it holds it for the life of the project. Ask internally before assuming any
+  scope or account is available to use.
 
 ## When to revisit
 
 Either of these makes it worth finishing — until then, nothing here needs doing:
 
-1. **The `@pokt-network` org is recovered** (npm support handles abandoned-org
-   disputes; the strong evidence is control of the domain, the GitHub org, and
-   the repository the packages point at). Then it publishes into the right home
-   with no personal account involved, and the package names in `generate.mjs`
-   already match.
+1. **The publishing identity is settled** — which scope, owned by whom. The names
+   in `generate.mjs` and the shim's `PACKAGES` table follow from that answer.
 2. **A user actually asks for npm.** Today the demand is inferred, not reported.
 
 The release workflow's `npm` job already skips and says so when no credential is
@@ -110,11 +105,9 @@ in `.goreleaser.yaml`, in both directions. The mapping is written down three tim
 
 ## What publishing would take, if it is picked up
 
-1. **Somewhere to publish.** `@pokt-network` cannot simply be created — it already
-   exists and is not ours to use any more (see above). Recovering it is the good
-   outcome; publishing everything unscoped (`pocket-ap`, `pocket-ap-<os>-<cpu>`,
-   all of which were free as of 2026-08-20) is the workaround, and needs one
-   constant changed in `generate.mjs` and the shim's `PACKAGES` table.
+1. **A decision on the package names**, scoped or unscoped. Changing them is one
+   constant in `generate.mjs` plus the shim's `PACKAGES` table — but only once,
+   since a published name cannot be taken back.
 2. **Trusted Publishing rather than a token.** GitHub Actions authenticates over
    OIDC, so there is no secret to store, rotate or leak, and provenance is
    automatic. It needs Node ≥ 22.14 and npm ≥ 11.5.1 — the workflow currently

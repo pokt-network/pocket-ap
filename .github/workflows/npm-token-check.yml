@@ -36,11 +36,12 @@ jobs:
           set -euo pipefail
 
           if [ -z "${NODE_AUTH_TOKEN}" ]; then
-            echo "NPM_TOKEN is not set. npm publishing is not wired up yet."
-            echo "To enable it: create the @pokt-network org on npmjs.com, then a"
-            echo "GRANULAR ACCESS token with write access to pocket-ap and the"
-            echo "@pokt-network/pocket-ap-* packages. A classic token with 2FA"
-            echo "required on publish cannot be used from CI."
+            echo "NPM_TOKEN is not set. npm publishing is not wired up, which is"
+            echo "the expected state — see npm/README.md, where publishing is"
+            echo "deferred deliberately. If that changes, this needs a GRANULAR"
+            echo "ACCESS token with write access to the pocket-ap packages, or"
+            echo "better, Trusted Publishing via OIDC and no token at all. A"
+            echo "classic token with 2FA required on publish cannot run in CI."
             echo "publishable=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
