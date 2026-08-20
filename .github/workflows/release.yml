@@ -97,3 +97,10 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:${{ github.ref_name }}
             ghcr.io/${{ github.repository }}:latest
+          # Releases are weeks apart, so nothing here is hot — but `go mod
+          # download` is a layer of its own keyed on go.mod/go.sum alone, and
+          # that is the part worth carrying between them. mode=max keeps the
+          # intermediate build stage too, not just the scratch image, which is
+          # the only way any of the compile survives.
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
