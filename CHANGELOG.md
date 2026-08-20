@@ -8,6 +8,11 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
+- **npm packaging scaffolding** (`npm/`), built but not published — it waits on an
+  npm organisation and token, which are human steps listed in `npm/README.md`. A
+  wrapper package with one payload package per platform, selected through
+  `optionalDependencies`, so there is no postinstall: it works offline, behind a
+  proxy, and under `--ignore-scripts`.
 - **`network: beta|main` and a `--network` flag** on both `serve` and `call`. One
   key sets both full-node transports, so they cannot end up naming different
   chains — a config that fetches sessions from one chain and block height from
