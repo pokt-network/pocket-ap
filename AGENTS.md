@@ -102,14 +102,17 @@ failing as if the network were down.
 ```sh
 make build                                   # -> bin/pocket-ap
 mkdir -p local                               # gitignored; absent in a fresh clone
-cp config.example.yaml local/config.yaml     # ⚠️ this example is MAINNET
+cp config.example.yaml local/config.yaml     # ships network: "beta"
 export POCKET_APP_PRIVATE_KEY=<64 hex chars> # preferred over putting it in the file
 ./bin/pocket-ap serve -config local/config.yaml
 ```
 
-For Beta, switch both `fullnode` lines to `sauron-grpc.beta.infra.pocket.network:443`
-and `https://sauron-rpc.beta.infra.pocket.network`. A Beta app against a MainNet
-node reads as "the network is broken", not as "wrong network".
+`network` sets both full-node transports at once, so they cannot name different
+chains: `beta` is `sauron-grpc.beta.infra.pocket.network:443` +
+`https://sauron-rpc.beta.infra.pocket.network`, `main` is the same two without
+`.beta`. `-network main` overrides the file for one run and ⚠️ spends real POKT.
+Naming `network` and `fullnode.*` in the same file is an error — set `fullnode`
+alone for your own node.
 
 Minimum viable config (`config.schema.yaml` is the machine-readable contract):
 

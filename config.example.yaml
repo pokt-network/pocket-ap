@@ -48,31 +48,31 @@ app:
 #   - private_key_hex: ""     # staked for, say, pnf-pocket-beta
 #   - private_key_hex: ""     # staked for, say, eth
 
-# You do NOT need to run your own full node. These are the public endpoints
-# operated by Pocket Network Foundation; both transports below are required.
+# You do NOT need to run your own full node. `network` points at the public ones
+# operated by Pocket Network Foundation, setting BOTH required transports at once
+# — gRPC for sessions/apps/accounts, CometBFT RPC for block height — so they can
+# never end up naming different chains.
 #
-#   MainNet (chain "pocket") — what this example uses. ⚠️ EVERY RELAY SPENDS
-#   REAL POKT from your app's stake. There is no dry-run and no refund.
-#     grpc_host_port: "sauron-grpc.infra.pocket.network:443"
-#     rpc_url:        "https://sauron-rpc.infra.pocket.network"
+#   beta — Beta TestNet (chain "pocket-lego-testnet"). Worthless tokens, exactly
+#          the same code path. This is the default here on purpose.
+#   main — MainNet (chain "pocket"). ⚠️ EVERY RELAY SPENDS REAL POKT from your
+#          app's stake. There is no dry-run and no refund.
 #
-#   Beta TestNet (chain "pocket-lego-testnet") — worthless tokens, same code
-#   path. Switch both lines to these while you are still finding your feet:
-#     grpc_host_port: "sauron-grpc.beta.infra.pocket.network:443"
-#     rpc_url:        "https://sauron-rpc.beta.infra.pocket.network"
+# Switch for one run without editing this file:
 #
-# Running your own node instead? Set both to it and flip grpc_insecure: true
-# (see below). Public endpoints are shared infrastructure — fine to start on,
-# worth replacing with your own node if you depend on this.
-fullnode:
-  # gRPC endpoint: session / app / account / shared-params queries.
-  grpc_host_port: "sauron-grpc.infra.pocket.network:443"
-  # TLS on the gRPC connection. Keep false for any public endpoint — true sends
-  # your queries in plaintext, and is only for a local node with no TLS.
-  grpc_insecure: false
-  # CometBFT RPC endpoint: current block height (drives session rotation).
-  # A different port/host from the gRPC one above — not the same service.
-  rpc_url: "https://sauron-rpc.infra.pocket.network"
+#   pocket-ap serve -config local/config.yaml -network main
+#   pocket-ap call  -config local/config.yaml -network main -d '...'
+#
+# The flag overrides whatever is written here. Running your own node instead?
+# DELETE the `network` line and set `fullnode` yourself — naming both is an error,
+# because a file that says "beta" and also names a hostname has one of them wrong
+# and no way to say which:
+#
+#   fullnode:
+#     grpc_host_port: "localhost:9090"
+#     grpc_insecure: true          # only for a local node with no TLS
+#     rpc_url: "http://localhost:26657"
+network: "beta"
 
 # Each listener = one local address bound to one (service, rpc_type). Point your
 # app's RPC_URL at the addr. rpc_type is one of:

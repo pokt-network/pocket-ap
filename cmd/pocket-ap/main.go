@@ -233,9 +233,33 @@ func orEnv(v, key string) string {
 	return os.Getenv(key)
 }
 
+// applyNetworkFlag handles -network for both subcommands.
+//
+// It logs at WARN for a network whose relays cost real value. That is the one
+// mistake this flag makes easy — switching is now a word, so the word has to say
+// what it costs — and it is a log line rather than a prompt because a proxy is
+// something people run from systemd, where a prompt is a hang.
+func applyNetworkFlag(cfg *config.Config, name string) error {
+	if name == "" {
+		return nil
+	}
+	n, err := cfg.SetNetwork(name)
+	if err != nil {
+		return err
+	}
+	if n.SpendsRealValue {
+		slog.Warn("network selected: every relay spends real POKT from your app's stake",
+			"network", name, "chain_id", n.ChainID, "grpc", n.GRPCHostPort)
+	} else {
+		slog.Info("network selected", "network", name, "chain_id", n.ChainID, "grpc", n.GRPCHostPort)
+	}
+	return nil
+}
+
 func runServe(args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
 	configPath := fs.String("config", "", "path to config YAML (or set POCKET_AP_CONFIG)")
+	network := fs.String("network", "", "point the full node at a named network ("+strings.Join(config.NetworkNames(), "|")+"), overriding the config")
 	if err := fs.Parse(args); err != nil {
 		return err
 	}
@@ -245,6 +269,9 @@ func runServe(args []string) error {
 
 	cfg, err := config.Load(orEnv(*configPath, "POCKET_AP_CONFIG"))
 	if err != nil {
+		return err
+	}
+	if err := applyNetworkFlag(cfg, *network); err != nil {
 		return err
 	}
 	if len(cfg.Listeners) == 0 {

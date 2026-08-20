@@ -283,20 +283,31 @@ id=$(docker create ghcr.io/pokt-network/pocket-ap:v0.1.1)
 docker cp "$id:/etc/pocket-ap/config.example.yaml" local/config.yaml && docker rm "$id"
 ```
 
-**2. Point it at a network. ⚠️ The example is MainNet, where every relay spends
-real POKT from your stake — there is no dry run and no refund.** For Beta, which
-is what the staking walkthrough above uses and what costs nothing, switch both
-`fullnode` lines:
+**2. Pick a network.** The example ships `network: "beta"` — the Beta TestNet the
+staking walkthrough above uses, where relays cost nothing. One key sets both
+full-node transports, so they cannot end up naming different chains.
+
+Switch for a single run without editing anything:
+
+```sh
+pocket-ap serve -config local/config.yaml -network main   # ⚠️ spends real POKT
+```
+
+⚠️ **On `main`, every relay spends real POKT from your app's stake — no dry run,
+no refund.** The flag says so at startup, at WARN.
+
+`network` and `fullnode.*` are mutually exclusive in a config file: naming a
+network and also spelling out a hostname means one of them is wrong with no way
+to say which, and the failure that produces — a full node that has never heard of
+your app — reads as "the network is broken" rather than "wrong network". Delete
+the `network` line and set `fullnode` yourself to point at your own node:
 
 ```yaml
 fullnode:
-  grpc_host_port: "sauron-grpc.beta.infra.pocket.network:443"
-  rpc_url: "https://sauron-rpc.beta.infra.pocket.network"
+  grpc_host_port: "localhost:9090"
+  grpc_insecure: true          # only for a local node with no TLS
+  rpc_url: "http://localhost:26657"
 ```
-
-A Beta app pointed at a MainNet full node does not fail in a way that tells you
-this: the node has simply never heard of your app, so it reads as "the network is
-broken" rather than "wrong network".
 
 **3. Give it the key and run.** `service_id` stays optional — an app stakes for
 exactly one service, so pocket-ap reads it off the chain at startup.

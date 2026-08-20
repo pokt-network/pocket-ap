@@ -80,6 +80,7 @@ func runCall(args []string) error {
 		timeout    = fs.Duration("timeout", 30*time.Second, "deadline for the whole call, failover included")
 		verbose    = fs.Bool("v", false, "print relay diagnostics to stderr")
 		compareURL = fs.String("compare", "", "also send the request straight to this URL and diff the two responses")
+		network    = fs.String("network", "", "point the full node at a named network ("+strings.Join(config.NetworkNames(), "|")+"), overriding the config")
 	)
 	headers := headerFlag{}
 	fs.Var(headers, "H", `extra request header, "Name: value" (repeatable)`)
@@ -103,6 +104,9 @@ func runCall(args []string) error {
 
 	cfg, err := config.Load(orEnv(*configPath, "POCKET_AP_CONFIG"))
 	if err != nil {
+		return err
+	}
+	if err := applyNetworkFlag(cfg, *network); err != nil {
 		return err
 	}
 	body, err := readBody(*data)

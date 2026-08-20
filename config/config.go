@@ -35,6 +35,14 @@ type Config struct {
 	// HTTP/2", while gRPC-Web crosses untouched because it carries its trailers
 	// inside the body.
 	GRPCMode string `yaml:"grpc_mode"`
+
+	// Network names a set of public full-node endpoints ("beta" or "main") so
+	// the two transports move together. It is a shorthand for fullnode's two
+	// endpoint fields, never a supplement to them: setting both is an error, on
+	// the reasoning that a file naming a network AND a pair of hostnames has one
+	// of them wrong and no way to tell which. The -network flag is the override
+	// for switching quickly; a config file is not the place for ambiguity.
+	Network string `yaml:"network"`
 }
 
 // Admin configures the /health listener. It binds its own port, separate from
@@ -192,10 +200,53 @@ func Load(path string) (*Config, error) {
 
 	cfg.applyKeyEnv()
 
+	if err := cfg.applyNetworkField(); err != nil {
+		return nil, err
+	}
+
 	if err := cfg.validate(); err != nil {
 		return nil, err
 	}
 	return &cfg, nil
+}
+
+// applyNetworkField resolves a config's `network:` shorthand into the two
+// fullnode endpoints.
+//
+// Naming a network AND spelling out an endpoint is refused rather than resolved
+// by precedence. Either order of precedence silently discards something the
+// operator wrote, and the failure it produces — a full node that does not know
+// your app — reads as "the network is broken" rather than "you configured two
+// networks". SetNetwork exists for the case where overriding IS the intent.
+func (c *Config) applyNetworkField() error {
+	if c.Network == "" {
+		return nil
+	}
+	n, err := LookupNetwork(c.Network)
+	if err != nil {
+		return fmt.Errorf("config: %w", err)
+	}
+	if c.FullNode.GRPCHostPort != "" || c.FullNode.RPCURL != "" {
+		return fmt.Errorf("config: network: %q and fullnode endpoints are both set — remove one; network sets fullnode.grpc_host_port and fullnode.rpc_url for you (%s, %s)",
+			c.Network, n.GRPCHostPort, n.RPCURL)
+	}
+	c.applyNetwork(n)
+	return nil
+}
+
+// SetNetwork repoints the full node at a named network, replacing whatever the
+// config said. This is what -network does: an operator passing it on the command
+// line is stating an intent for this run that outranks the file, which is the
+// whole point of being able to switch quickly. It returns the resolved Network
+// so a caller can report which one is in effect and whether relays cost real
+// value.
+func (c *Config) SetNetwork(name string) (Network, error) {
+	n, err := LookupNetwork(name)
+	if err != nil {
+		return Network{}, err
+	}
+	c.applyNetwork(n)
+	return n, nil
 }
 
 // applyKeyEnv fills in keys from the environment, so neither form has to keep a

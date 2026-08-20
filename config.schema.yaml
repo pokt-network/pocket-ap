@@ -139,6 +139,10 @@ properties:
       You do not need to run a node — the Pocket Network Foundation operates
       public ones. Beta TestNet (chain "pocket-lego-testnet") is the default and
       the place to start; MainNet (chain "pocket") spends real POKT.
+
+      Both endpoints are required UNLESS the top-level `network` key supplies
+      them, which is the usual way to name a public network. Set them here for
+      your own node.
     required:
       - grpc_host_port
       - rpc_url
@@ -191,6 +195,30 @@ properties:
           restarting will not fix an unreachable full node.
         examples:
           - 127.0.0.1:9090
+
+  network:
+    type: string
+    description: >-
+      Shorthand for the two fullnode endpoints, so they cannot name different
+      chains. "beta" is the Beta TestNet (chain "pocket-lego-testnet"), where
+      relays cost nothing; "main" is MainNet (chain "pocket"), where every relay
+      spends real POKT from your app's stake.
+
+      Setting this AND a fullnode endpoint is an error rather than a precedence
+      rule: a file that names a network and also spells out a hostname has one of
+      them wrong, and whichever the loader discarded, the result reads as "the
+      network is broken" rather than "you configured two networks". Leave this
+      out and set fullnode.* directly when you run your own node.
+
+      The -network flag overrides whatever the file says, for switching between
+      the two without editing anything.
+    enum:
+      - ""
+      - beta
+      - main
+    examples:
+      - beta
+      - main
 
   grpc_mode:
     type: string
