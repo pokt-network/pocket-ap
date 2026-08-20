@@ -687,8 +687,8 @@ Auto tries native once per supplier host and remembers the answer.
 
 ## Roadmap
 
-`v0.1.1` (2026-08-20) is the first published release, and it contains everything
-under **shipped** below.
+`v0.1.2` (2026-08-20) is the current release; `v0.1.1` the same day was the first
+one with artifacts. Everything under **shipped** below is in them.
 
 - **shipped** — all five Shannon RPC types, each live-verified against Beta:
   JSON-RPC, REST and CometBFT over one HTTP adapter, WebSocket (2026-07-22), gRPC
