@@ -216,8 +216,9 @@ Crash-fast is defensible. Applying it **by accident, to whichever subset of fail
 This is a near-verbatim lift of SAGE, so a bug found here is usually a bug found
 there — and **nobody upstream is tracking these**.
 
-Open right now:
-- **poktroll's faucet client is broken on every network** (`app/pocket/networks.go:53-55`): all three hardcoded URLs are NXDOMAIN, and `--faucet-base-url` — which `pocketd faucet fund --help` tells you to use — is not a real flag, so it cannot be pointed at the faucet that does work. Found 2026-08-19 while writing the onboarding docs. Not filed yet.
+Open right now: **nothing.**
+
+- **poktroll's faucet client is broken on every network** (`app/pocket/networks.go:53-55`): all three hardcoded URLs are NXDOMAIN, and `--faucet-base-url` — which `pocketd faucet fund --help` tells you to use — is not a real flag, so it cannot be pointed at the faucet that does work. Found 2026-08-19 while writing the onboarding docs. **Decided 2026-08-20 not to file it** — the working beta faucet is a browser page and the README says so, which is what an onboarding reader needs. Kept here because the finding is still true and someone will rediscover it; do not spend time re-deriving it.
 
 Previously open, now closed: **nothing else.** Both entries that used to sit here were re-checked on 2026-08-19 and neither survived — which is the point of re-checking rather than carrying a list forward.
 

@@ -55,7 +55,14 @@ jobs:
       - name: Release
         uses: goreleaser/goreleaser-action@v6
         with:
-          version: "~> v2"
+          # PINNED, not a range. "~> v2" resolves to whatever the newest v2.x is
+          # on the day someone tags, which is a moving part in the one job that
+          # cannot be rehearsed — and .goreleaser.yaml still uses `brews:`, which
+          # goreleaser has deprecated in favour of `homebrew_casks`. A v2.x that
+          # drops it would fail this release at config parse, on a tag that is
+          # already public. Bump this deliberately, after running
+          # `goreleaser release --snapshot --clean` locally on the new version.
+          version: "v2.17.1"
           args: release --clean
         env:
           # Two DIFFERENT credentials, and they are not interchangeable.
