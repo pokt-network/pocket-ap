@@ -19,37 +19,14 @@ jobs:
   # a missing or under-permissioned tap token fails after the tag is public and
   # the release is out, which is the worst moment to discover it and awkward to
   # undo. Checking first costs seconds and fails while nothing has shipped.
+  # It lives in its own workflow so it can also be run on demand, without a tag.
+  # Testing a credential by pushing a tag is expensive: the Go module proxy caches
+  # a tag's content permanently, so a version number spent on a failed release
+  # cannot be reused.
   preflight:
     name: preflight
-    runs-on: ubuntu-latest
-    steps:
-      - name: The tap token exists and can write to the tap
-        env:
-          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
-        run: |
-          set -euo pipefail
-
-          if [ -z "${HOMEBREW_TAP_GITHUB_TOKEN}" ]; then
-            echo "::error::HOMEBREW_TAP_GITHUB_TOKEN is empty."
-            echo "It is an ORGANISATION secret, so also confirm this repository is"
-            echo "on its access list — an org secret that exists but is not shared"
-            echo "with the repo arrives here as an empty string, not as an error."
-            exit 1
-          fi
-
-          # .permissions.push is the actual answer to "can goreleaser push the
-          # formula", which is not the same question as "does the token work".
-          # A token that can READ the tap gets a clean 200 here and still fails
-          # at push time.
-          push=$(gh api repos/${{ github.repository_owner }}/homebrew-tap \
-                   --jq '.permissions.push // false' 2>/dev/null || echo "unreachable")
-
-          case "$push" in
-            true)        echo "Tap token can push to homebrew-tap." ;;
-            false)       echo "::error::Token reaches homebrew-tap but cannot push. It needs Contents: Read and write."; exit 1 ;;
-            unreachable) echo "::error::Token cannot see ${{ github.repository_owner }}/homebrew-tap at all. For a fine-grained PAT the usual cause is the resource owner being a personal account rather than the organisation, which makes org repos invisible instead of forbidden."; exit 1 ;;
-          esac
-        shell: bash
+    uses: ./.github/workflows/tap-token-check.yml
+    secrets: inherit
 
   release:
     name: release

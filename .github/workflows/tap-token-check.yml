@@ -1,0 +1,62 @@
+name: Tap token check
+
+# Only a release needs this credential, and until now pushing a tag was the only
+# way to exercise it. That is an expensive test: the Go module proxy caches a
+# tag's content permanently, so a version number spent on a failed release can
+# never be reused. This runs the same check on demand and costs nothing.
+#
+# release.yml calls this as its preflight rather than keeping a second copy of
+# the script. Two copies of one check is two things to get wrong, and the copy
+# that never runs on its own is the one that rots.
+on:
+  workflow_dispatch:
+  workflow_call:
+
+jobs:
+  check:
+    name: tap token
+    runs-on: ubuntu-latest
+    steps:
+      - name: The tap token exists and can write to the tap
+        env:
+          # gh reads its credential from GH_TOKEN. Setting only the tap token
+          # below left `gh api` with no credential at all, so it failed before it
+          # ever reached GitHub and the check reported "cannot see the tap" about
+          # a token it had never used. Point GH_TOKEN at the tap token: exercising
+          # that exact credential is the entire purpose of this job.
+          GH_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+          HOMEBREW_TAP_GITHUB_TOKEN: ${{ secrets.HOMEBREW_TAP_GITHUB_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${HOMEBREW_TAP_GITHUB_TOKEN}" ]; then
+            echo "::error::HOMEBREW_TAP_GITHUB_TOKEN is empty."
+            echo "It is an ORGANISATION secret, so also confirm this repository is"
+            echo "on its access list — an org secret that exists but is not shared"
+            echo "with the repo arrives here as an empty string, not as an error."
+            exit 1
+          fi
+
+          # .permissions.push is the actual answer to "can goreleaser push the
+          # formula", which is not the same question as "does the token work".
+          # A token that can READ the tap gets a clean 200 here and still fails
+          # at push time.
+          #
+          # stderr is KEPT. Discarding it is what made the first real failure
+          # unreadable: every possible cause collapsed into one guess printed by
+          # this script, and the guess was wrong. What gh says is the evidence.
+          if ! push=$(gh api repos/${{ github.repository_owner }}/homebrew-tap \
+                        --jq '.permissions.push // false' 2>&1); then
+            echo "::error::Tap token could not query ${{ github.repository_owner }}/homebrew-tap. gh reported: ${push}"
+            echo "A 401 means the secret's value is expired, revoked or malformed."
+            echo "A 404 on a PUBLIC repo means the same thing: a valid token with no"
+            echo "access still gets 200 here, so absence points at the credential."
+            exit 1
+          fi
+
+          case "$push" in
+            true)  echo "Tap token can push to homebrew-tap." ;;
+            false) echo "::error::Token reaches homebrew-tap but cannot push. It needs Contents: Read and write, with the fine-grained PAT's resource owner set to ${{ github.repository_owner }} rather than a personal account."; exit 1 ;;
+            *)     echo "::error::Unexpected answer from gh: ${push}"; exit 1 ;;
+          esac
+        shell: bash
