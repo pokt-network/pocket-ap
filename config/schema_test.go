@@ -4,6 +4,7 @@ import (
 	"os"
 	"path/filepath"
 	"reflect"
+	"regexp"
 	"sort"
 	"strings"
 	"testing"
@@ -311,6 +312,53 @@ func TestExampleConfigLoads(t *testing.T) {
 	for _, l := range cfg.Listeners {
 		if !strings.HasPrefix(l.Addr, "127.0.0.1:") && !strings.HasPrefix(l.Addr, "localhost:") {
 			t.Errorf("the example config binds %q — it must bind loopback, or everyone who copies it exposes their stake to their network", l.Addr)
+		}
+	}
+}
+
+// The README pins a version in five places: two ghcr pulls, the release-archive
+// snippet, the raw.githubusercontent URL its config.example.yaml comes from, and
+// the `docker create` that copies that file out of the image. Every one of them
+// is a literal, and a literal that nothing checks is a literal that survives the
+// next release unchanged — pointing a new user at artifacts for a version that is
+// no longer the current one.
+//
+// The CHANGELOG's newest released heading is the source of truth here because it
+// is a tracked file: reading the newest git tag instead would make this test need
+// a repository and a network, and `GOPROXY=off` builds are something this repo
+// keeps working on purpose.
+func TestREADMEVersionMatchesChangelog(t *testing.T) {
+	changelog, err := os.ReadFile(filepath.Join("..", "CHANGELOG.md"))
+	if err != nil {
+		t.Fatalf("read CHANGELOG.md: %v", err)
+	}
+	// "## [0.1.1] - 2026-08-20" — the first such heading that is not [Unreleased].
+	released := regexp.MustCompile(`(?m)^## \[(\d+\.\d+\.\d+)\]`).FindSubmatch(changelog)
+	if released == nil {
+		t.Fatal("CHANGELOG.md has no released version heading of the form '## [x.y.z]'")
+	}
+	want := "v" + string(released[1])
+
+	readme, err := os.ReadFile(filepath.Join("..", "README.md"))
+	if err != nil {
+		t.Fatalf("read README.md: %v", err)
+	}
+	// Scoped to OUR artifacts on purpose. A bare version regex also matches
+	// poktroll's v0.1.34, which the docs name for an entirely different reason
+	// and which must not move when pocket-ap releases. The first draft of this
+	// test did exactly that and failed on it.
+	pinned := regexp.MustCompile(`(?m)pokt-network/pocket-ap[:/](v\d+\.\d+\.\d+)|^VERSION=(v\d+\.\d+\.\d+)`)
+	matches := pinned.FindAllStringSubmatch(string(readme), -1)
+	if len(matches) == 0 {
+		t.Fatalf("README.md pins no pocket-ap version at all — it should reference %s where it names artifacts", want)
+	}
+	for _, m := range matches {
+		got := m[1]
+		if got == "" {
+			got = m[2]
+		}
+		if got != want {
+			t.Errorf("README.md references pocket-ap %s but CHANGELOG.md's newest release is %s — every pinned version in the README has to move with a release, or it points at artifacts that are no longer current", got, want)
 		}
 	}
 }

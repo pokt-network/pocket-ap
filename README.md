@@ -263,8 +263,8 @@ Three things, whichever way you installed: a config, the right network, a key.
 `config.example.yaml`. Homebrew and Docker do not put one in front of you.
 
 ```sh
-mkdir -p local     # gitignored, and where your key ends up — the mkdir is needed
-                   # on a fresh clone, which has no local/ at all
+mkdir -p local     # gitignored — the mkdir is needed on a fresh clone, which
+                   # has no local/ at all
 
 # source checkout, or an unpacked release archive
 cp config.example.yaml local/config.yaml
@@ -321,12 +321,23 @@ pocketd query application show-application <your-app-addr> --network=beta -o jso
   | jq '.application.service_configs'
 ```
 
-Check it works before wiring anything up — one relay, no daemon:
+Check it works before wiring anything up — one relay, no daemon. **Send
+something the service you staked for can actually answer:**
 
 ```sh
+# a Cosmos service — pnf-pocket-beta, which is what the walkthrough above stakes for
+pocket-ap call -config local/config.yaml -rpc-type comet_bft -X GET -path /status
+
+# an EVM service — pnf-anvil and the like
 pocket-ap call -config local/config.yaml \
     -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
 ```
+
+Sending the EVM one to a Cosmos service answers
+`{"error":{"code":-32601,"message":"Method not found"}}`, and **that is a working
+relay** — it travelled to a supplier and the chain replied. Add `-v` to see the
+session, the supplier and each attempt, which is what distinguishes this from
+anything the proxy got wrong.
 
 **The key must be the APP's own key, not a gateway key.** The app address is
 derived from it, so a wrong key does not error — it makes you a different app.
