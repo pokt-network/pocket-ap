@@ -429,11 +429,12 @@ curl localhost:9090/pocket-ap/health
 {
   "status": "ok",
   "apps": [ { "address": "pokt1e3scnf3tfs9t44pawlvpemm6r0ggy3un4avmdk", "service_id": "pnf-anvil" } ],
+  "uptime_seconds": 128.4,
   "chain": { "block_height": 476830, "height_age_seconds": 0.2, "poll_interval_seconds": 10 },
   "services": [
-    { "service_id": "pnf-anvil", "session_id": "87c4421…", "endpoints": 37,
-      "session_cached": true, "attempts": 3, "successes": 3, "failures": 0,
-      "mean_latency_ms": 156.2 }
+    { "service_id": "pnf-anvil", "session_id": "87c4421…", "session_end_height": 476840,
+      "endpoints": 37, "session_cached": true, "attempts": 3, "successes": 3,
+      "failures": 0, "mean_latency_ms": 156.2 }
   ]
 }
 ```
@@ -574,7 +575,10 @@ obeying. Supplier *quality* remains SAGE's job (see the note under Roadmap).
 
 ## Security
 
-Three defaults worth knowing, because each one exists for a reason that is not obvious:
+Two defaults worth knowing, because each exists for a reason that is not obvious
+— and both were verified on the wire, rejecting with **zero relays spent**.
+
+### Reject browser origins
 
 Every listener rejects browser `Origin` headers by default, and leaves native
 clients — node, curl, go, which send no `Origin` — alone. Allowlist per listener:

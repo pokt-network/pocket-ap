@@ -247,11 +247,19 @@ nothing is persisted or exported anywhere.
 
 ```json
 { "status": "ok",
-  "chain": { "block_height": 478443, "height_age_seconds": 1.9 },
   "apps": [ { "address": "pokt1e3s…", "service_id": "pnf-anvil" } ],
-  "services": [ { "service_id": "pnf-anvil", "session_cached": true,
-                  "attempts": 3, "successes": 3, "failures": 0 } ] }
+  "uptime_seconds": 128.4,
+  "chain": { "block_height": 478443, "height_age_seconds": 1.9,
+             "poll_interval_seconds": 10 },
+  "services": [ { "service_id": "pnf-anvil", "session_id": "87c4421…",
+                  "session_end_height": 478450, "endpoints": 37,
+                  "session_cached": true, "attempts": 3, "successes": 3,
+                  "failures": 0, "mean_latency_ms": 156.2 } ] }
 ```
+
+Per-service `session_*`, `endpoints` and `mean_latency_ms` appear once that
+service has fetched a session and served a relay; everything else is always
+present.
 
 `height_age_seconds` climbing is the leading indicator of breakage. Note
 `attempts > successes` is normal — it means failover worked.
