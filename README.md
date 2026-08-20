@@ -167,8 +167,8 @@ network is down.
 
 ## Installation
 
-Pick one. **Building from source works today**; the prebuilt paths land with the
-first tagged release.
+Pick one. Homebrew, the prebuilt archives and the Linux packages all come out of
+the same tagged release, built by goreleaser; building from source works too.
 
 ### From source (Go 1.26+)
 
@@ -178,7 +178,7 @@ make build              # -> bin/pocket-ap (CGO off, single static binary)
 ./bin/pocket-ap version
 ```
 
-Or straight into `$GOBIN`, once the repo is public:
+Or straight into `$GOBIN`:
 
 ```sh
 go install github.com/pokt-network/pocket-ap/cmd/pocket-ap@latest
@@ -202,12 +202,55 @@ docker run --rm -p 8545:8545 -p 9090:9090 \
 reach the host; Docker's port mapping is the boundary instead. This is the one
 place the "always bind loopback" rule flips — the Dockerfile explains why.
 
-### Prebuilt binaries & packages — at first release
+### Homebrew (macOS and Linux)
 
-Tagged releases will ship stripped binaries and `.deb` / `.rpm` / `.apk` packages
-for darwin (arm64/amd64), linux (amd64/arm64) and windows (amd64), with a
-checksums file, via [goreleaser](.goreleaser.yaml). A **Homebrew tap** and an
-**npm launcher** are planned (see Roadmap); both need the repo public first.
+```sh
+brew tap pokt-network/tap
+brew trust --formula pokt-network/tap/pocket-ap
+brew install pocket-ap
+```
+
+**The `brew trust` line is not optional on Homebrew 6 or newer**, which refuses to
+load a formula from a third-party tap until told to:
+
+```
+Error: Refusing to load formula pokt-network/tap/pocket-ap from untrusted tap pokt-network/tap.
+```
+
+`brew trust pokt-network/tap` trusts the tap as a whole — every formula it carries
+now and every one added later. Trusting the single formula is the narrower grant,
+so that is what is written above.
+
+### Prebuilt binaries & packages
+
+Every tagged release carries stripped binaries for darwin (arm64/amd64), linux
+(amd64/arm64) and windows (amd64), `.deb` / `.rpm` / `.apk` packages for both
+linux architectures, and a `checksums.txt` — all from
+[goreleaser](.goreleaser.yaml).
+
+```sh
+VERSION=v0.1.1
+OS=darwin ARCH=arm64      # also built: darwin/amd64, linux/amd64, linux/arm64
+BASE=https://github.com/pokt-network/pocket-ap/releases/download/$VERSION
+
+curl -sSLO $BASE/pocket-ap_${OS}_${ARCH}.tar.gz
+curl -sSLO $BASE/checksums.txt
+shasum -a 256 -c checksums.txt --ignore-missing   # sha256sum -c on linux
+tar xzf pocket-ap_${OS}_${ARCH}.tar.gz && ./pocket-ap version
+```
+
+**Check the checksum rather than skipping it.** What you are downloading is the
+process that will hold your staked app's private key. `--ignore-missing` is what
+lets one checksums file verify the single archive you fetched instead of failing
+over the eleven you did not.
+
+The binaries are stripped (`-s -w`); that is what keeps them near 100 MB instead
+of 150 MB, since the cosmos-sdk / cometbft / go-ethereum tree is large. Panic
+stack traces are unaffected — stripping drops the symbol table and DWARF, not the
+pclntab — but `dlv` cannot debug a stripped binary, so build from source without
+`-ldflags` for that.
+
+An **npm launcher** is still planned (see Roadmap).
 
 ## Quickstart
 
