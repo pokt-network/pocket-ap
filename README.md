@@ -200,11 +200,11 @@ staked key and there should be nothing to pivot to if the process is ever
 compromised. Published for `linux/amd64` and `linux/arm64`:
 
 ```sh
-docker pull ghcr.io/pokt-network/pocket-ap:v0.1.1   # or :latest
+docker pull ghcr.io/pokt-network/pocket-ap:v0.1.2   # or :latest
 docker run --rm -p 8545:8545 -p 9090:9090 \
     -v "$PWD/local/config.yaml:/etc/pocket-ap/config.yaml:ro" \
     -e POCKET_APP_PRIVATE_KEY \
-    ghcr.io/pokt-network/pocket-ap:v0.1.1
+    ghcr.io/pokt-network/pocket-ap:v0.1.2
 ```
 
 Or build it yourself — `docker build -t pocket-ap:local .`, or `make docker`,
@@ -241,7 +241,7 @@ linux architectures, and a `checksums.txt` — all from
 [goreleaser](.goreleaser.yaml).
 
 ```sh
-VERSION=v0.1.1
+VERSION=v0.1.2
 OS=darwin ARCH=arm64      # also built: darwin/amd64, linux/amd64, linux/arm64
 BASE=https://github.com/pokt-network/pocket-ap/releases/download/$VERSION
 
@@ -280,7 +280,7 @@ cp config.example.yaml local/config.yaml
 
 # anything else — pinned to the version you installed, not to main
 curl -sSL -o local/config.yaml \
-  https://raw.githubusercontent.com/pokt-network/pocket-ap/v0.1.1/config.example.yaml
+  https://raw.githubusercontent.com/pokt-network/pocket-ap/v0.1.2/config.example.yaml
 ```
 
 The image ships its own copy at `/etc/pocket-ap/config.example.yaml`. It is `FROM
@@ -288,7 +288,7 @@ scratch`, so there is no shell and no `cat` to pipe it out with — copy it off 
 container that never runs:
 
 ```sh
-id=$(docker create ghcr.io/pokt-network/pocket-ap:v0.1.1)
+id=$(docker create ghcr.io/pokt-network/pocket-ap:v0.1.2)
 docker cp "$id:/etc/pocket-ap/config.example.yaml" local/config.yaml && docker rm "$id"
 ```
 
@@ -698,7 +698,9 @@ under **shipped** below.
   per-request headers, so an external QoS process can steer without a restart
   (2026-08-06); Homebrew, ghcr images, signed checksums and Linux packages
   (2026-08-20)
-- **on `main`, unreleased** — `network: beta|main` plus a `--network` flag
+- **`v0.1.2`** — `network: beta|main` plus a `--network` flag, `--help` reaching
+  the real usage, long flags spelled `--`, and a container image that
+  cross-compiles rather than emulating
 - **next** — app rotation (several apps on ONE service); a recorded SSE/NDJSON run
   — it works, it needs a reachable inference service to write down
 - **deferred** — an npm launcher. The scaffolding is written (`npm/`) and
