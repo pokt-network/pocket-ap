@@ -6,7 +6,38 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
 
-Nothing yet.
+### Added
+
+- **`network: beta|main` and a `-network` flag** on both `serve` and `call`. One
+  key sets both full-node transports, so they cannot end up naming different
+  chains — a config that fetches sessions from one chain and block height from
+  another fails like an outage rather than like a typo. The flag overrides the
+  file for a single run; `main` warns at startup that relays spend real POKT.
+  `config.example.yaml` now ships `network: "beta"`, so the default costs
+  nothing.
+- The Homebrew formula installs `config.example.yaml` and `config.schema.yaml`
+  into `pkgshare`. Brew was the only install path that discarded them, leaving
+  its users with a binary and nothing to point `-config` at.
+
+### Changed
+
+- The container image **cross-compiles instead of emulating**. The build stage
+  had no platform pin, so buildx compiled the whole dependency tree under QEMU
+  for the non-native architecture: 39 minutes for `v0.1.1`'s `linux/arm64` leg.
+  Image layers are also cached to the Actions cache now.
+
+### Fixed
+
+- The Quickstart assumed a source checkout throughout, so a Homebrew or Docker
+  user had no `config.example.yaml` to copy; `cp config.example.yaml
+  local/config.yaml` also failed outright on a fresh clone, since `local/` is
+  gitignored and therefore absent.
+- The Quickstart's own verification call sent `eth_blockNumber` to
+  `pnf-pocket-beta`, a Cosmos chain, so the first command a new user ran replied
+  `Method not found` from a relay that had in fact worked.
+- The docs said `config.example.yaml` pointed at Beta when it pointed at MainNet
+  — the wrong direction to be wrong in, since MainNet relays spend real POKT.
+- A `[Configuration](#configuration)` link that matched no heading.
 
 ## [0.1.1] - 2026-08-20
 

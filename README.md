@@ -153,12 +153,21 @@ is listed for completeness — pocket-ap does not use it (`pocketd` and block
 explorers do); a full node's own REST is unrelated to a `rest` **listener**,
 which relays to suppliers.
 
-`config.example.yaml` ships pointed at **MainNet**, because that is where a
-staked app usually lives. ⚠️ **Every relay spends real POKT** from your app's
-stake — there is no dry-run and nothing to refund. Switch both `fullnode` lines
-to the Beta column while you are finding your feet: the tokens are worthless and
-the code path is identical. These are shared infrastructure — fine to build on, worth swapping for your
-own node if you come to depend on it.
+**You do not normally write these two hostnames.** `network: beta` or
+`network: main` sets both at once — they have to name the same chain, and setting
+them separately is the one edit that must not be done by halves. `-network`
+overrides the file for a single run:
+
+```sh
+pocket-ap serve -config local/config.yaml -network main
+```
+
+`config.example.yaml` ships `network: "beta"`, where the tokens are worthless and
+the code path is identical. ⚠️ **On `main`, every relay spends real POKT** from
+your app's stake — no dry-run, nothing to refund; the flag warns at startup.
+These are shared infrastructure — fine to build on, worth swapping for your own
+node if you come to depend on it, which is what setting `fullnode` directly is
+for.
 
 `pocketd` reaches them with `--network=beta` (or `main`), which sets `--chain-id`,
 `--node` and `--grpc-addr` in one go. **Without it, `pocketd` defaults to a node
@@ -678,12 +687,23 @@ Auto tries native once per supplier host and remembers the answer.
 
 ## Roadmap
 
-- **v0** — HTTP passthrough, single app, random select, `call` one-shot, `/health`, brew + docker
-- **v0.1** — retry-next-supplier, npm launcher
-- **v1** — WebSocket ✅ done and live-validated (2026-07-22)
-- **v1.1** — multi-app ✅, service discovery from the key ✅, supplier allow/deny ✅ (all live-verified on beta, 2026-08-04), then per-request supplier lists via header ✅ and host-level lists ✅ (so an external QoS process can steer without a restart, by supplier or by relay-miner operator)
-- **next** — app rotation (several apps on ONE service), a recorded SSE/NDJSON run (it works; it needs a reachable inference service to write down)
-- **later** — wasm SDK for edge/serverless (swaps gRPC→cosmos REST), delegated-gateway signer mode
+`v0.1.1` (2026-08-20) is the first published release, and it contains everything
+under **shipped** below.
+
+- **shipped** — all five Shannon RPC types, each live-verified against Beta:
+  JSON-RPC, REST and CometBFT over one HTTP adapter, WebSocket (2026-07-22), gRPC
+  relaying and a gRPC listener; failover to the next supplier; `call` one-shot;
+  `/health`; multi-app with service discovery from the key (2026-08-04); supplier
+  allow/deny by address **and** by relay-miner host, from config **and** from
+  per-request headers, so an external QoS process can steer without a restart
+  (2026-08-06); Homebrew, ghcr images, signed checksums and Linux packages
+  (2026-08-20)
+- **on `main`, unreleased** — `network: beta|main` plus a `-network` flag
+- **next** — an npm launcher, the one distribution channel with no scaffolding at
+  all; app rotation (several apps on ONE service); a recorded SSE/NDJSON run — it
+  works, it needs a reachable inference service to write down
+- **later** — wasm SDK for edge/serverless (swaps gRPC→cosmos REST),
+  delegated-gateway signer mode
 
 Supplier quality (QoS, reputation, height-awareness) is deliberately **not** on
 this list. It is gateway work, and it lives in SAGE — pocket-ap fails over to the

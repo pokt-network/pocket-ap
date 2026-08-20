@@ -88,8 +88,10 @@ Both transports are required and they are **different hosts**.
 | `fullnode.grpc_host_port` | `sauron-grpc.beta.infra.pocket.network:443` | `sauron-grpc.infra.pocket.network:443` |
 | `fullnode.rpc_url` | `https://sauron-rpc.beta.infra.pocket.network` | `https://sauron-rpc.infra.pocket.network` |
 
-TLS on `:443` both — keep `grpc_insecure: false`. Default to **Beta**; MainNet
-spends real POKT. (REST/LCD exists too — `sauron-api[.beta].infra.pocket.network`
+TLS on `:443` both — keep `grpc_insecure: false`, which `network:` enforces for
+you. Prefer `network: beta|main` over writing these: it sets both transports at
+once so they cannot name different chains, and spelling one out alongside it is a
+config error. Default to **Beta**; MainNet spends real POKT. (REST/LCD exists too — `sauron-api[.beta].infra.pocket.network`
 — but pocket-ap never calls it. It is for `pocketd` and explorers, and is
 unrelated to a `rest` listener, which relays to suppliers.)
 
@@ -117,9 +119,7 @@ alone for your own node.
 Minimum viable config (`config.schema.yaml` is the machine-readable contract):
 
 ```yaml
-fullnode:
-  grpc_host_port: "sauron-grpc.beta.infra.pocket.network:443"  # gRPC: sessions, apps, accounts
-  rpc_url: "https://sauron-rpc.beta.infra.pocket.network"      # CometBFT RPC: block height. BOTH required.
+network: "beta"                     # sets BOTH fullnode transports; "main" spends real POKT
 listeners:
   - addr: "127.0.0.1:8545"          # loopback. see "Hard rules".
     rpc_type: "json_rpc"
