@@ -699,9 +699,13 @@ under **shipped** below.
   (2026-08-06); Homebrew, ghcr images, signed checksums and Linux packages
   (2026-08-20)
 - **on `main`, unreleased** — `network: beta|main` plus a `--network` flag
-- **next** — an npm launcher, the one distribution channel with no scaffolding at
-  all; app rotation (several apps on ONE service); a recorded SSE/NDJSON run — it
-  works, it needs a reachable inference service to write down
+- **next** — app rotation (several apps on ONE service); a recorded SSE/NDJSON run
+  — it works, it needs a reachable inference service to write down
+- **deferred** — an npm launcher. The scaffolding is written (`npm/`) and
+  deliberately not published: pocket-ap is a daemon rather than a library, brew
+  and the container image already serve that use, and the npm scopes this project
+  once owned are no longer reachable — so publishing would mean a personal account
+  holding a project-critical name. `npm/README.md` says what would change that.
 - **later** — wasm SDK for edge/serverless (swaps gRPC→cosmos REST),
   delegated-gateway signer mode
 
