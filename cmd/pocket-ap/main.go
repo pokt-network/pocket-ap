@@ -57,18 +57,42 @@ usage:
 run "pocket-ap <command> -h" for a command's flags.
 `
 
-func main() {
-	cmd, args := "serve", os.Args[1:]
+// dispatch maps a command line to a subcommand and its remaining arguments.
+//
+// Split out of main so the routing can be tested: every entry point below is one
+// somebody actually types, and three of them used to land somewhere unhelpful.
+func dispatch(argv []string) (cmd string, args []string) {
+	cmd, args = "serve", argv
 	// A leading flag rather than a verb keeps the original bare
 	// "pocket-ap -config x" invocation working.
 	if len(args) > 0 && !strings.HasPrefix(args[0], "-") {
 		cmd, args = args[0], args[1:]
 	}
-	// -version/--version too: it is what everyone types, and it would otherwise
-	// reach the serve flagset and die as an unknown flag.
-	if len(os.Args) > 1 && (os.Args[1] == "-version" || os.Args[1] == "--version") {
-		cmd = "version"
+	if len(argv) == 0 {
+		// A bare invocation is someone finding out what this is, not someone who
+		// meant to serve with no config. It used to reach runServe and fail with
+		// `config: read : open : no such file or directory` — an empty path in a
+		// message about a file, which reads as a bug in the program rather than
+		// as a missing argument.
+		return "help-exit2", nil
 	}
+	switch argv[0] {
+	// -version/--version: what everyone types, and it would otherwise reach the
+	// serve flagset and die as an unknown flag.
+	case "-version", "--version":
+		return "version", nil
+	// Help is the same trap and a worse one: without this the leading-flag rule
+	// sends -h to the SERVE flagset, which answers "Usage of serve:" and two
+	// flags — so the most common way to ask what a program does is the one way
+	// that hides `call` and `version` entirely.
+	case "-h", "-help", "--help":
+		return "help", nil
+	}
+	return cmd, args
+}
+
+func main() {
+	cmd, args := dispatch(os.Args[1:])
 
 	var err error
 	switch cmd {
@@ -80,8 +104,14 @@ func main() {
 		fmt.Println(versionString())
 		return
 	case "help":
-		fmt.Fprint(os.Stderr, usage)
+		// stdout: an explicit request for help is answered, not diagnosed, and
+		// `pocket-ap help | less` should show something.
+		fmt.Print(usage)
 		return
+	case "help-exit2":
+		// stderr and non-zero: nothing was asked for, so this is a diagnostic.
+		fmt.Fprint(os.Stderr, usage)
+		os.Exit(2)
 	default:
 		fmt.Fprintf(os.Stderr, "unknown command %q\n\n%s", cmd, usage)
 		os.Exit(2)
