@@ -8,8 +8,8 @@
 # and the build below then cross-compiles to $TARGETARCH. Without it, buildx runs
 # this whole stage inside an emulated container for every non-native platform —
 # which means compiling a 929-module cosmos-sdk / cometbft / go-ethereum tree
-# under QEMU. That took over 40 minutes for the linux/arm64 leg of v0.1.1 while
-# the native leg finished in minutes. Go cross-compiles this tree natively with
+# under QEMU. That took 39 minutes for the linux/arm64 leg of v0.1.1 while the
+# native leg finished in minutes. Go cross-compiles this tree natively with
 # CGO off, so emulation buys nothing whatsoever here.
 FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
 WORKDIR /src

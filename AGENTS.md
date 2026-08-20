@@ -101,10 +101,15 @@ failing as if the network were down.
 
 ```sh
 make build                                   # -> bin/pocket-ap
-cp config.example.yaml local/config.yaml     # local/ is gitignored; already points at Beta
+mkdir -p local                               # gitignored; absent in a fresh clone
+cp config.example.yaml local/config.yaml     # ⚠️ this example is MAINNET
 export POCKET_APP_PRIVATE_KEY=<64 hex chars> # preferred over putting it in the file
 ./bin/pocket-ap serve -config local/config.yaml
 ```
+
+For Beta, switch both `fullnode` lines to `sauron-grpc.beta.infra.pocket.network:443`
+and `https://sauron-rpc.beta.infra.pocket.network`. A Beta app against a MainNet
+node reads as "the network is broken", not as "wrong network".
 
 Minimum viable config (`config.schema.yaml` is the machine-readable contract):
 

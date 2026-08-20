@@ -54,7 +54,7 @@ less pocketd-install.sh && bash pocketd-install.sh
 ### From nothing to a working relay
 
 pocket-ap relays for an app that is **already staked**. If you have one, skip to
-[Configuration](#configuration). If you do not, this is the whole path — it is
+[Quickstart](#quickstart). If you do not, this is the whole path — it is
 `pocketd` work, not pocket-ap work, and it is the part neither tool's docs
 previously owned.
 
@@ -188,15 +188,18 @@ go install github.com/pokt-network/pocket-ap/cmd/pocket-ap@latest
 
 The image is `FROM scratch` — no shell, no package manager — because it holds a
 staked key and there should be nothing to pivot to if the process is ever
-compromised. Build it locally and mount your config:
+compromised. Published for `linux/amd64` and `linux/arm64`:
 
 ```sh
-docker build -t pocket-ap:local .        # or: make docker (stamps version/commit)
+docker pull ghcr.io/pokt-network/pocket-ap:v0.1.1   # or :latest
 docker run --rm -p 8545:8545 -p 9090:9090 \
     -v "$PWD/local/config.yaml:/etc/pocket-ap/config.yaml:ro" \
     -e POCKET_APP_PRIVATE_KEY \
-    pocket-ap:local
+    ghcr.io/pokt-network/pocket-ap:v0.1.1
 ```
+
+Or build it yourself — `docker build -t pocket-ap:local .`, or `make docker`,
+which stamps the version and commit into `pocket-ap version`.
 
 **Inside a container, bind `0.0.0.0`, not loopback.** A loopback listener does not
 reach the host; Docker's port mapping is the boundary instead. This is the one
@@ -254,16 +257,61 @@ An **npm launcher** is still planned (see Roadmap).
 
 ## Quickstart
 
-```sh
-make build                                  # -> bin/pocket-ap
-cp config.example.yaml local/config.yaml    # local/ is gitignored — it holds your key
-# fullnode.* already points at Beta. service_id is optional — one app stakes for
-# exactly one service, so pocket-ap reads it off the chain at startup.
+Three things, whichever way you installed: a config, the right network, a key.
 
-export POCKET_APP_PRIVATE_KEY=<64 hex chars>   # keeps the key out of any file
-./bin/pocket-ap serve -config local/config.yaml
-# then point your client at http://127.0.0.1:8545
+**1. Get a config.** The source tree and the release archives both carry
+`config.example.yaml`. Homebrew and Docker do not put one in front of you.
+
+```sh
+mkdir -p local     # gitignored, and where your key ends up — the mkdir is needed
+                   # on a fresh clone, which has no local/ at all
+
+# source checkout, or an unpacked release archive
+cp config.example.yaml local/config.yaml
+
+# anything else — pinned to the version you installed, not to main
+curl -sSL -o local/config.yaml \
+  https://raw.githubusercontent.com/pokt-network/pocket-ap/v0.1.1/config.example.yaml
 ```
+
+The image ships its own copy at `/etc/pocket-ap/config.example.yaml`. It is `FROM
+scratch`, so there is no shell and no `cat` to pipe it out with — copy it off a
+container that never runs:
+
+```sh
+id=$(docker create ghcr.io/pokt-network/pocket-ap:v0.1.1)
+docker cp "$id:/etc/pocket-ap/config.example.yaml" local/config.yaml && docker rm "$id"
+```
+
+**2. Point it at a network. ⚠️ The example is MainNet, where every relay spends
+real POKT from your stake — there is no dry run and no refund.** For Beta, which
+is what the staking walkthrough above uses and what costs nothing, switch both
+`fullnode` lines:
+
+```yaml
+fullnode:
+  grpc_host_port: "sauron-grpc.beta.infra.pocket.network:443"
+  rpc_url: "https://sauron-rpc.beta.infra.pocket.network"
+```
+
+A Beta app pointed at a MainNet full node does not fail in a way that tells you
+this: the node has simply never heard of your app, so it reads as "the network is
+broken" rather than "wrong network".
+
+**3. Give it the key and run.** `service_id` stays optional — an app stakes for
+exactly one service, so pocket-ap reads it off the chain at startup.
+
+```sh
+export POCKET_APP_PRIVATE_KEY=<64 hex chars>   # keeps the key out of any file
+
+./bin/pocket-ap serve -config local/config.yaml   # from source
+pocket-ap serve -config local/config.yaml         # brew, or any binary on PATH
+```
+
+Docker needs two more things, both covered in [Docker](#docker): mount the config
+in, and bind `0.0.0.0` inside the container rather than loopback.
+
+Then point your client at `http://127.0.0.1:8545`.
 
 Whatever service your app is staked for is what it can relay. Confirm it before
 blaming the proxy (this is also what pocket-ap discovers for you at startup):
@@ -276,7 +324,7 @@ pocketd query application show-application <your-app-addr> --network=beta -o jso
 Check it works before wiring anything up — one relay, no daemon:
 
 ```sh
-./bin/pocket-ap call -config local/config.yaml \
+pocket-ap call -config local/config.yaml \
     -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
 ```
 

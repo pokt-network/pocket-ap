@@ -106,6 +106,12 @@ brews:
       system "#{bin}/pocket-ap", "version"
     install: |
       bin.install "pocket-ap"
+      # The archive also carries the example config and its schema, and without
+      # these two lines brew is the ONLY install path that throws them away — a
+      # brew user would have a binary and nothing to point -config at. They land
+      # in pkgshare, which `brew --prefix pocket-ap` locates.
+      pkgshare.install "config.example.yaml"
+      pkgshare.install "config.schema.yaml"
     caveats: |
       pocket-ap signs relays with your staked app's PRIVATE KEY and every relay
       spends your stake. Two things before you run it:
