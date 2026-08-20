@@ -8,6 +8,37 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 Nothing yet.
 
+## [0.1.1] - 2026-08-20
+
+**This is the first release with artifacts.** It is `0.1.0` plus a release-workflow
+fix; no relay, transport or configuration behaviour changed between the two.
+
+`v0.1.0` was tagged and published nothing. Its release workflow checks that the
+Homebrew tap credential can push *before* anything ships — goreleaser publishes
+the GitHub release and only then pushes the formula, so a bad token would
+otherwise fail at the one moment nothing can be undone. That check was itself
+broken: it exported the tap token as `HOMEBREW_TAP_GITHUB_TOKEN` but `gh` reads
+its credential from `GH_TOKEN`, so `gh api` ran with no credential at all, and
+`2>/dev/null` discarded the reason. The check reported that the token could not
+see the tap. The token could see the tap the whole time.
+
+The `v0.1.0` tag is left in place rather than moved. The Go module proxy caches a
+tag's content permanently, so re-pointing it would hand anyone who had already
+fetched it a checksum mismatch.
+
+### Fixed
+
+- The release preflight authenticates `gh` with `GH_TOKEN` and keeps stderr, so a
+  future failure reports what `gh` actually said instead of the script's guess.
+
+### Added
+
+- `tap-token-check.yml`, dispatchable on its own and called by the release
+  workflow as its preflight. Pushing a tag was previously the only way to
+  exercise the tap credential, and that is an expensive test: a version number
+  spent on a failed release cannot be reused. One copy, so the dispatchable check
+  and the one gating a real release cannot drift.
+
 ## [0.1.0] - 2026-08-19
 
 First public release. Everything below is what ships in it.
@@ -117,5 +148,6 @@ been exercised at debugging volumes, not production ones. Treat 0.1.0 as
   rollover closed the bridge with the expected client-facing code and no protocol
   error from the relay miner. No panics were recovered during the run.
 
-[Unreleased]: https://github.com/pokt-network/pocket-ap/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/pokt-network/pocket-ap/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/pokt-network/pocket-ap/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/pokt-network/pocket-ap/releases/tag/v0.1.0
