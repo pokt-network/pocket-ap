@@ -93,8 +93,8 @@ Put that hex string in `POCKET_APP_PRIVATE_KEY` (not in a file), point
 `service_id` is derived from the key, so there is nothing else to configure:
 
 ```sh
-POCKET_APP_PRIVATE_KEY=<hex> ./bin/pocket-ap call -config config.yaml -v \
-  -X GET -path /status
+POCKET_APP_PRIVATE_KEY=<hex> ./bin/pocket-ap call --config config.yaml -v \
+  -X GET --path /status
 ```
 
 Four things that bite, in the order they bite:
@@ -155,11 +155,11 @@ which relays to suppliers.
 
 **You do not normally write these two hostnames.** `network: beta` or
 `network: main` sets both at once — they have to name the same chain, and setting
-them separately is the one edit that must not be done by halves. `-network`
+them separately is the one edit that must not be done by halves. `--network`
 overrides the file for a single run:
 
 ```sh
-pocket-ap serve -config local/config.yaml -network main
+pocket-ap serve --config local/config.yaml --network main
 ```
 
 `config.example.yaml` ships `network: "beta"`, where the tokens are worthless and
@@ -299,7 +299,7 @@ full-node transports, so they cannot end up naming different chains.
 Switch for a single run without editing anything:
 
 ```sh
-pocket-ap serve -config local/config.yaml -network main   # ⚠️ spends real POKT
+pocket-ap serve --config local/config.yaml --network main   # ⚠️ spends real POKT
 ```
 
 ⚠️ **On `main`, every relay spends real POKT from your app's stake — no dry run,
@@ -324,8 +324,8 @@ exactly one service, so pocket-ap reads it off the chain at startup.
 ```sh
 export POCKET_APP_PRIVATE_KEY=<64 hex chars>   # keeps the key out of any file
 
-./bin/pocket-ap serve -config local/config.yaml   # from source
-pocket-ap serve -config local/config.yaml         # brew, or any binary on PATH
+./bin/pocket-ap serve --config local/config.yaml   # from source
+pocket-ap serve --config local/config.yaml         # brew, or any binary on PATH
 ```
 
 Docker needs two more things, both covered in [Docker](#docker): mount the config
@@ -346,10 +346,10 @@ something the service you staked for can actually answer:**
 
 ```sh
 # a Cosmos service — pnf-pocket-beta, which is what the walkthrough above stakes for
-pocket-ap call -config local/config.yaml -rpc-type comet_bft -X GET -path /status
+pocket-ap call --config local/config.yaml --rpc-type comet_bft -X GET --path /status
 
 # an EVM service — pnf-anvil and the like
-pocket-ap call -config local/config.yaml \
+pocket-ap call --config local/config.yaml \
     -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
 ```
 
@@ -372,15 +372,15 @@ is the fastest way to answer "is my staked app working?", and the tool to reach
 for when debugging a service.
 
 ```sh
-pocket-ap call -config local/config.yaml \
+pocket-ap call --config local/config.yaml \
     -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
 # {"jsonrpc":"2.0","id":1,"result":"0x0"}
 ```
 
 The body goes to stdout verbatim, so it pipes into `jq`; everything else goes to
-stderr. `-service` and `-rpc-type` are inferred from the config when its
+stderr. `--service` and `--rpc-type` are inferred from the config when its
 listeners make them unambiguous. Flags mirror curl: `-X`, `-H`, `-d` (`@file`
-and `-` for stdin), `-path`.
+and `-` for stdin), `--path`.
 
 `-v` reports what the relay actually did — the session, which supplier answered,
 and each failover:
@@ -395,11 +395,11 @@ attempt 1: pokt18na0p7t37du6s5yufvajfatwhkv362qyjytxvz in 304ms via https://rm.b
 total:     1.605s
 ```
 
-`-compare <url>` sends the same request straight to a URL as well and diffs the
+`--compare <url>` sends the same request straight to a URL as well and diffs the
 two responses — the quickest way to tell a relay problem from a backend one:
 
 ```sh
-pocket-ap call -config local/config.yaml -compare https://cloudflare-eth.com \
+pocket-ap call --config local/config.yaml --compare https://cloudflare-eth.com \
     -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}'
 ```
 
@@ -698,7 +698,7 @@ under **shipped** below.
   per-request headers, so an external QoS process can steer without a restart
   (2026-08-06); Homebrew, ghcr images, signed checksums and Linux packages
   (2026-08-20)
-- **on `main`, unreleased** — `network: beta|main` plus a `-network` flag
+- **on `main`, unreleased** — `network: beta|main` plus a `--network` flag
 - **next** — an npm launcher, the one distribution channel with no scaffolding at
   all; app rotation (several apps on ONE service); a recorded SSE/NDJSON run — it
   works, it needs a reachable inference service to write down

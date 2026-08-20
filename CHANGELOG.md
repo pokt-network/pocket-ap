@@ -8,7 +8,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ### Added
 
-- **`network: beta|main` and a `-network` flag** on both `serve` and `call`. One
+- **`network: beta|main` and a `--network` flag** on both `serve` and `call`. One
   key sets both full-node transports, so they cannot end up naming different
   chains — a config that fetches sessions from one chain and block height from
   another fails like an outage rather than like a typo. The flag overrides the
@@ -17,7 +17,7 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   nothing.
 - The Homebrew formula installs `config.example.yaml` and `config.schema.yaml`
   into `pkgshare`. Brew was the only install path that discarded them, leaving
-  its users with a binary and nothing to point `-config` at.
+  its users with a binary and nothing to point `--config` at.
 
 ### Changed
 
@@ -26,8 +26,20 @@ follow [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   for the non-native architecture: 39 minutes for `v0.1.1`'s `linux/arm64` leg.
   Image layers are also cached to the Actions cache now.
 
+### Changed
+
+- **Long flags are written `--config`, `--network`, `--service` and so on**, in
+  the docs and in what `--help` prints. Go's `flag` package has always accepted
+  one dash or two interchangeably, so **every existing single-dash invocation
+  keeps working** — this is spelling, not parsing. One-letter flags (`-v`, `-H`,
+  `-X`, `-d`) stay short, as convention expects.
+
 ### Fixed
 
+- `pocket-ap --help`, `-h` and a bare `pocket-ap` now reach the top-level usage.
+  `--help` used to hit the leading-flag rule and print `Usage of serve:`, hiding
+  that `call` and `version` exist; a bare invocation failed with `config: read :
+  open : no such file or directory`, an empty path in a message about a file.
 - The Quickstart assumed a source checkout throughout, so a Homebrew or Docker
   user had no `config.example.yaml` to copy; `cp config.example.yaml
   local/config.yaml` also failed outright on a fresh clone, since `local/` is
@@ -115,7 +127,7 @@ been exercised at debugging volumes, not production ones. Treat 0.1.0 as
   `allow` is exhaustive (and therefore removes failover if it names one supplier);
   `deny` wins over `allow`.
 - **`serve`** — the daemon, one listener per RPC type.
-- **`call`** — one-shot relay for debugging, with `-v` diagnostics and `-compare`
+- **`call`** — one-shot relay for debugging, with `-v` diagnostics and `--compare`
   against a reference URL.
 - **`version`** — ldflags-stamped build info.
 - **Health endpoint** (`health/`) on its own opt-in admin port: `GET

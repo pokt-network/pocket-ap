@@ -32,23 +32,23 @@ stderr. This is a debug and verification tool: every invocation fetches a fresh
 session from the full node, so it is not a path for production traffic.
 
 examples:
-  pocket-ap call -config local/config.yaml \
+  pocket-ap call --config local/config.yaml \
       -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
 
-  pocket-ap call -config local/config.yaml -service pnf-anvil -rpc-type rest \
-      -X GET -path /v1/status -v
+  pocket-ap call --config local/config.yaml --service pnf-anvil --rpc-type rest \
+      -X GET --path /v1/status -v
 
   # send the same request both ways and diff the answers
-  pocket-ap call -config local/config.yaml -compare https://rpc.ankr.com/eth \
+  pocket-ap call --config local/config.yaml --compare https://rpc.ankr.com/eth \
       -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}'
 
   # pin this one relay to a supplier (the per-request form of suppliers.allow;
   # it can only narrow what the config allows, never widen it)
-  pocket-ap call -config local/config.yaml -v \
+  pocket-ap call --config local/config.yaml -v \
       -H 'X-Pocket-Allow-Suppliers: pokt1…' \
       -d '{"jsonrpc":"2.0","id":1,"method":"eth_chainId","params":[]}'
 
-flags:
+flags (one dash or two both work — -v and -X are the short forms):
 `
 
 // headerFlag collects repeatable -H "Name: value" flags into relay headers.
@@ -88,7 +88,7 @@ func runCall(args []string) error {
 	fs.StringVar(data, "d", "", "alias for -data")
 	fs.Usage = func() {
 		fmt.Fprint(os.Stderr, callUsage)
-		fs.PrintDefaults()
+		printFlags(fs, os.Stderr)
 	}
 	if err := fs.Parse(args); err != nil {
 		return err

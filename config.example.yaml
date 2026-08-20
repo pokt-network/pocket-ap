@@ -60,8 +60,8 @@ app:
 #
 # Switch for one run without editing this file:
 #
-#   pocket-ap serve -config local/config.yaml -network main
-#   pocket-ap call  -config local/config.yaml -network main -d '...'
+#   pocket-ap serve --config local/config.yaml --network main
+#   pocket-ap call  --config local/config.yaml --network main -d '...'
 #
 # The flag overrides whatever is written here. Running your own node instead?
 # DELETE the `network` line and set `fullnode` yourself — naming both is an error,

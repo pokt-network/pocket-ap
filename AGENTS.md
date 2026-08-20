@@ -106,13 +106,13 @@ make build                                   # -> bin/pocket-ap
 mkdir -p local                               # gitignored; absent in a fresh clone
 cp config.example.yaml local/config.yaml     # ships network: "beta"
 export POCKET_APP_PRIVATE_KEY=<64 hex chars> # preferred over putting it in the file
-./bin/pocket-ap serve -config local/config.yaml
+./bin/pocket-ap serve --config local/config.yaml
 ```
 
 `network` sets both full-node transports at once, so they cannot name different
 chains: `beta` is `sauron-grpc.beta.infra.pocket.network:443` +
 `https://sauron-rpc.beta.infra.pocket.network`, `main` is the same two without
-`.beta`. `-network main` overrides the file for one run and ⚠️ spends real POKT.
+`.beta`. `--network main` overrides the file for one run and ⚠️ spends real POKT.
 Naming `network` and `fullnode.*` in the same file is an error — set `fullnode`
 alone for your own node.
 
@@ -176,7 +176,7 @@ URL where a host belongs — is a **400** and costs no relay.
 "is this working?", and the right first move when anything is wrong.
 
 ```sh
-pocket-ap call -config local/config.yaml \
+pocket-ap call --config local/config.yaml \
     -d '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}'
 # {"jsonrpc":"2.0","id":1,"result":"0x0"}
 ```
@@ -192,7 +192,7 @@ attempt 1: pokt18na0p7t... in 304ms via https://rm.beta.infra.pocket.network -> 
 ```
 
 Body goes to stdout verbatim (pipe to `jq`); everything else to stderr.
-`-compare <url>` sends the same request straight to a URL too and diffs them —
+`--compare <url>` sends the same request straight to a URL too and diffs them —
 that is how you tell a relay problem from a backend problem.
 
 ## Error → what it actually means
@@ -270,7 +270,7 @@ abandoned partway and is worth investigating — but it does not by itself chang
   Loopback also enables the Host check that closes DNS rebinding.
 - **Never set `allowed_origins: ["*"]` to make an error go away.** It hands every
   site the user visits the ability to relay with their key.
-- **Do not treat `call` or `-compare` as a traffic path.** Every invocation fetches
+- **Do not treat `call` or `--compare` as a traffic path.** Every invocation fetches
   a fresh session. They are debug tools; `serve` is the path.
 
 ## Known limits — do not report these as bugs

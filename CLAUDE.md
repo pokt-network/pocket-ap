@@ -15,7 +15,7 @@ It was extracted (lifted, near-verbatim) from the sibling **SAGE** repo (`../sag
 
 - `make build` — binary to `bin/pocket-ap` (CGO off)
 - `make run CONFIG_PATH=local/config.yaml`
-- `./bin/pocket-ap call -config local/config.yaml -d '{...}' -v` — one-shot relay + diagnostics (see below)
+- `./bin/pocket-ap call --config local/config.yaml -d '{...}' -v` — one-shot relay + diagnostics (see below)
 - `make test` / `make vet` / `make lint` / `make tidy`
 - Single test: `go test ./pocket/ -run TestFoo -race -count=1 -v`
 
@@ -61,7 +61,7 @@ pocket/          Pocket/Shannon impls: fullnode, session, endpoint, signer, vali
 
 `pocket-ap call` is a **fifth transport**: it reuses `relay.Relayer.Relay` whole and
 adds no core code. Two subcommands now exist (`serve`, `call`); a bare leading flag
-still dispatches to `serve`, so `pocket-ap -config x` keeps working.
+still dispatches to `serve`, so `pocket-ap --config x` keeps working.
 
 - **No `SessionManager.Start()` in `call`.** A one-shot process always misses the
   session cache, and `Session()` only consults the polled height on a *cache hit*
@@ -74,14 +74,14 @@ still dispatches to `serve`, so `pocket-ap -config x` keeps working.
   hook, and proof the seams compose.
 - **`config.validate()` no longer requires listeners** — that is a *serve* constraint,
   enforced in `runServe`. A `call`-only config needs no listener.
-- **`-compare <url>`** sends the same request straight to a URL, concurrently, and diffs.
+- **`--compare <url>`** sends the same request straight to a URL, concurrently, and diffs.
   Verdict tiers: `identical` (bytes) → `equivalent` (same JSON, key order/whitespace) →
   `differ`. Headers/body go out verbatim on both sides so the comparison stays fair.
 - **Doctrine carve-out, read before "fixing" it:** `jsonEquivalent` in `call.go` is the
   only code that parses a payload. This does **not** license parsing elsewhere. The
   opaque-bytes rule governs the *relay path* — parsing that runs on every relay and
   drives decisions (which is exactly why roadmap #2 mandates an *active* height probe
-  instead of reading responses). `jsonEquivalent` runs only in `call -compare`, only to
+  instead of reading responses). `jsonEquivalent` runs only in `call --compare`, only to
   label a diff for a human, and feeds nothing back into routing or selection. Generic
   JSON is also not a chain format — nothing there knows what `eth_call` is.
 
@@ -191,9 +191,9 @@ Crash-fast is defensible. Applying it **by accident, to whichever subset of fail
 - **Signing is the SOVEREIGN app-key model.** `pocket.Signer` derives the app address *from the signing key*, so the configured key **must be the app's own key, never a gateway key.** The app key validates even when the app is delegated to a gateway (the app is always a ring member). This is the opposite of SAGE's centralized mode (which signs with the gateway key).
 - **`domain` stays dependency-free.** `domain.Session.Raw` carries the `*sessiontypes.Session` (as `any`) so the signer can read the SessionHeader without domain importing poktroll.
 - **CI lint must install a golangci-lint v2 binary — the version is coupled to `.golangci.yml`.** The config is `version: "2"`, and a v1 binary cannot parse it: it fails with `unsupported version of the configuration` while `make lint` passes locally (local has v2). `golangci-lint-action@v6` installs **v1** by default, which is exactly this trap. `.github/workflows/ci.yml` pins `golangci-lint-action@v7` + `version: v2.11.3` to match local, and runs `go build ./...` first — a cold type-check of the cosmos-sdk / geth / cometbft tree otherwise blows the lint timeout on a fresh runner. **Mirror of SAGE's `ci.yml`, which fixed this first; pocket-ap had drifted to the old `@v6`.** When bumping the local golangci-lint, bump the CI `version:` pin in lockstep or CI and local disagree.
-- **`network: beta|main` and `-network` are a SHORTHAND for the two fullnode endpoints, never a supplement.** `config/networks.go` is the **source** for those hostnames; `config.example.yaml`, `config.schema.yaml`, `README.md` and `AGENTS.md` are copies, and `TestNetworkEndpointsAreDocumentedEverywhere` checks the copies against the source — so a rotation is one edit in Go plus a list of which docs still disagree. Three rules, each load-bearing:
+- **`network: beta|main` and `--network` are a SHORTHAND for the two fullnode endpoints, never a supplement.** `config/networks.go` is the **source** for those hostnames; `config.example.yaml`, `config.schema.yaml`, `README.md` and `AGENTS.md` are copies, and `TestNetworkEndpointsAreDocumentedEverywhere` checks the copies against the source — so a rotation is one edit in Go plus a list of which docs still disagree. Three rules, each load-bearing:
   - **Both transports move together.** A config reaching one chain for sessions and another for block height fails like an outage, not like a typo. Naming the pair makes that unrepresentable, the same way `pocketd --network=beta` sets `--chain-id`, `--node` and `--grpc-addr` together.
-  - **`network:` + `fullnode.*` in one FILE is an error, not a precedence rule.** Either order silently discards something the operator wrote, and the result — a full node that has never heard of your app — reads as "the network is broken". **The `-network` FLAG does override the file**, because typing it is a statement of intent for this run; that is the whole point of switching quickly.
+  - **`network:` + `fullnode.*` in one FILE is an error, not a precedence rule.** Either order silently discards something the operator wrote, and the result — a full node that has never heard of your app — reads as "the network is broken". **The `--network` FLAG does override the file**, because typing it is a statement of intent for this run; that is the whole point of switching quickly.
   - **`applyNetwork` forces `grpc_insecure: false`.** Otherwise someone moving from a local node to a public endpoint keeps shipping every session query in plaintext while believing they only changed networks. Mutation-checked.
   - `main` carries `SpendsRealValue`, which drives a startup **WARN** — a log line, not a prompt, because a proxy runs under systemd where a prompt is a hang. **`config.example.yaml` ships `beta`**, so the default costs nothing; MainNet is a deliberate word.
 - **config:** value types, no `*bool`/`*int`; unknown fields error at load (`KnownFields(true)`). App key from `app.private_key_hex` / `apps[].private_key_hex`, or `POCKET_APP_PRIVATE_KEY` / `POCKET_APP_PRIVATE_KEYS` (see roadmap 7). Two knobs added 2026-07-22: top-level `grpc_mode` (see roadmap 1) and per-listener `max_connections` (WebSocket only). **`max_connections: 0` means the 10000 default, NOT unlimited** — an unbounded count of long-lived connections is the exact failure being prevented, so it must not be what saying nothing gets you; negative disables it. Every new config field must also land in `config.schema.yaml` or `TestSchemaMatchesConfigStructs` fails.
@@ -545,7 +545,7 @@ Two consequences worth knowing:
 
 Beta TestNet, 2026-07-15: `eth_blockNumber` → `0x0`, `eth_chainId` → `0x7a69` (anvil), HTTP 200, 37 endpoints in session, service `pnf-anvil`. Signed with the app's own key under gateway delegation — the core thesis, confirmed live.
 
-Beta TestNet, 2026-07-16 (`call` mode): `eth_blockNumber` → `0x0`, `eth_chainId` → `0x7a69`, `web3_clientVersion` → `anvil/v1.5.1`. 37/37 endpoints support `json_rpc`; first-attempt success at ~260-300ms; `selector.Random` observed picking a different supplier per invocation. All three `-compare` tiers exercised (local echo for `identical`/`equivalent`, cloudflare-eth for `differ`). Race-detector clean.
+Beta TestNet, 2026-07-16 (`call` mode): `eth_blockNumber` → `0x0`, `eth_chainId` → `0x7a69`, `web3_clientVersion` → `anvil/v1.5.1`. 37/37 endpoints support `json_rpc`; first-attempt success at ~260-300ms; `selector.Random` observed picking a different supplier per invocation. All three `--compare` tiers exercised (local echo for `identical`/`equivalent`, cloudflare-eth for `differ`). Race-detector clean.
 
 **Tests** (2026-07-16, 89 cases, `-race` clean): `relay` / `config` / `domain` / `selector` at 100% statement coverage; `pocket` at 9.1% (`sender.go` + `buildTargetURL` — the rest needs a live full node, see below). Every test was **mutation-checked**: 11 deliberate bugs were injected (wrong Rpc-Type enum, no failover, ignored MaxAttempts, `KnownFields(false)`, dropped rpc-type filter…) and all 11 were caught.
 

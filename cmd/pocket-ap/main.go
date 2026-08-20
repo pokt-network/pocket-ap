@@ -50,11 +50,12 @@ const defaultMaxAttempts = 3
 const usage = `pocket-ap — self-hosted Pocket Network RPC proxy
 
 usage:
-  pocket-ap serve -config <path>            run the front listeners (default)
-  pocket-ap call  -config <path> [flags]    one-shot relay, print the response
+  pocket-ap serve --config <path>           run the front listeners (default)
+  pocket-ap call  --config <path> [flags]   one-shot relay, print the response
   pocket-ap version                         print build info
 
-run "pocket-ap <command> -h" for a command's flags.
+run "pocket-ap <command> --help" for a command's flags.
+one dash or two both work: --config and -config are the same flag.
 `
 
 // dispatch maps a command line to a subcommand and its remaining arguments.
@@ -288,6 +289,10 @@ func applyNetworkFlag(cfg *config.Config, name string) error {
 
 func runServe(args []string) error {
 	fs := flag.NewFlagSet("serve", flag.ExitOnError)
+	fs.Usage = func() {
+		fmt.Fprint(os.Stderr, "pocket-ap serve — run the front listeners\n\nflags:\n")
+		printFlags(fs, os.Stderr)
+	}
 	configPath := fs.String("config", "", "path to config YAML (or set POCKET_AP_CONFIG)")
 	network := fs.String("network", "", "point the full node at a named network ("+strings.Join(config.NetworkNames(), "|")+"), overriding the config")
 	if err := fs.Parse(args); err != nil {
