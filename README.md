@@ -121,7 +121,7 @@ Four things that bite, in the order they bite:
   sign on your behalf, which is the arrangement pocket-ap exists to avoid.
 
 > ⚠️ **Step 2: use the web faucet, not `pocketd faucet fund`.** For Beta the
-> faucet is <https://faucet.beta.testnet.pokt.network/pokt/> — a browser page.
+> faucet is <[https://faucet.beta.testnet.pokt.network/pokt/](https://faucet.beta.pocket.network/)> — a browser page.
 > Paste the address from step 1.
 >
 > `pocketd faucet fund` will not get you there, and it is worth knowing why
