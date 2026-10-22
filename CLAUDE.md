@@ -429,6 +429,20 @@ in this section.
 
 ## Validated
 
+**Beta TestNet, 2026-10-22 — the `go 1.27.3` / `poktroll v0.1.36` bump, live.** The run that bump owed: v0.1.36 changed the ring verifier (see Conventions), so signing had to be re-proved on the wire, not only in the diff. Service `pnf-pocket-beta` (all five types), plus `pnf-anvil` as the second app; config `local/beta-config.yaml` (both keys, `network: beta`).
+
+| what | result |
+| --- | --- |
+| startup | both apps' `service_id` discovered from their keys, `listeners=6 apps=2` |
+| `call` json_rpc `status` | `pocket-lego-testnet`, **attempt 1 ok**, 557ms — ring signing intact on v0.1.36 |
+| `call` rest `GET /cosmos/bank/v1beta1/params` | `default_send_enabled: true`, attempt 1, 255ms |
+| `call` comet_bft `GET /block?height=493100` | full block, attempt 1, 301ms |
+| `call` grpc `/cosmos.bank.v1beta1.Query/Params` | attempt 1 ok, 581ms; native got the expected 505, fell back to gRPC-Web |
+| `call` anvil `eth_chainId` | `0x7a69`; attempt 1 hit the still-dead `…pnf-anvil-json.test.com`, attempt 2 ok |
+| `serve` gRPC listener over h2c | HTTP/2 200, `grpc-status: 0` as a trailer, body `0a 02 10 01` = `default_send_enabled: true` |
+| `serve` WebSocket `:8548` | ack + 5 NewBlock events over 150s (8.5KB-476KB), all **text** frames. Rollover not reached (~30s blocks). |
+| `/health` | `ok`; no `recovered_panics`; no `error`/`bad close` in the serve log |
+
 **2026-08-20 — FIRST PUBLIC RELEASE, and the Homebrew path proven on a real machine.** `v0.1.1` (`v0.1.0` shipped nothing — see roadmap 5).
 
 | what | result |
