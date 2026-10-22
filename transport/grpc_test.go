@@ -2,7 +2,6 @@ package transport
 
 import (
 	"context"
-	"crypto/tls"
 	"net"
 	"net/http"
 	"net/http/httptest"
@@ -10,7 +9,6 @@ import (
 	"testing"
 	"time"
 
-	"golang.org/x/net/http2"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
@@ -225,12 +223,10 @@ func TestHTTP_NonZeroGRPCStatusReachesTheClient(t *testing.T) {
 // both produce an error, so the obvious test proves nothing. An HTTP/2
 // prior-knowledge client distinguishes them.
 func h2cClient() *http.Client {
-	return &http.Client{Transport: &http2.Transport{
-		AllowHTTP: true,
-		DialTLSContext: func(ctx context.Context, network, addr string, _ *tls.Config) (net.Conn, error) {
-			return (&net.Dialer{}).DialContext(ctx, network, addr)
-		},
-	}}
+	// Unencrypted HTTP/2 only = prior knowledge: no HTTP/1.1 fallback to hide behind.
+	var protocols http.Protocols
+	protocols.SetUnencryptedHTTP2(true)
+	return &http.Client{Transport: &http.Transport{Protocols: &protocols}}
 }
 
 func TestHTTP_H2CEnabledOnGRPCListeners(t *testing.T) {
