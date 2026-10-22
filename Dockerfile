@@ -11,7 +11,7 @@
 # under QEMU. That took 39 minutes for the linux/arm64 leg of v0.1.1 while the
 # native leg finished in minutes. Go cross-compiles this tree natively with
 # CGO off, so emulation buys nothing whatsoever here.
-FROM --platform=$BUILDPLATFORM golang:1.26-alpine AS build
+FROM --platform=$BUILDPLATFORM golang:1.27-alpine AS build
 WORKDIR /src
 
 # Cache the module tree separately: it is ~929 modules and dominates the build.
